@@ -1,0 +1,411 @@
+import { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useSuppliers, useDeleteSupplier } from '@/hooks/useSuppliers';
+import {
+  useManagerInventory,
+  useDeleteManagerInventory,
+} from '@/hooks/useManagerInventory';
+import { SuppliersTable } from '@/components/suppliers/SuppliersTable';
+import { SupplierFormDialog } from '@/components/suppliers/SupplierFormDialog';
+import { DrinksTable } from '@/components/inventory/DrinksTable';
+import { InventoryTable } from '@/components/inventory/InventoryTable';
+import { DrinkFormDialog } from '@/components/inventory/DrinkFormDialog';
+import { AddStockDialog } from '@/components/inventory/AddStockDialog';
+import { TransferToBarDialog } from '@/components/inventory/TransferToBarDialog';
+import { InventoryAllocationsView } from '@/components/inventory/InventoryAllocationsView';
+import { BarStockManagement } from '@/components/inventory/BarStockManagement';
+import { useDrinks, useDeleteDrink } from '@/hooks/useDrinks';
+import type { Supplier, ManagerInventory, Drink } from '@/lib/api/types';
+import { Plus } from 'lucide-react';
+
+export function SuppliersAndInventoryPage() {
+  // Suppliers state
+  const { data: suppliers = [], isLoading: isLoadingSuppliers } = useSuppliers();
+  const { mutate: deleteSupplier } = useDeleteSupplier();
+  const [supplierFormOpen, setSupplierFormOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [deleteSupplierDialogOpen, setDeleteSupplierDialogOpen] = useState(false);
+  const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
+
+  // Drinks (Insumos) state
+  const { data: drinks = [], isLoading: isLoadingDrinks } = useDrinks();
+  const { mutate: deleteDrink } = useDeleteDrink();
+  const [drinkFormOpen, setDrinkFormOpen] = useState(false);
+  const [editingDrink, setEditingDrink] = useState<Drink | null>(null);
+  const [deleteDrinkDialogOpen, setDeleteDrinkDialogOpen] = useState(false);
+  const [drinkToDelete, setDrinkToDelete] = useState<Drink | null>(null);
+
+  // Inventory (Stock) state
+  const { data: inventory = [], isLoading: isLoadingInventory } =
+    useManagerInventory();
+  const { mutate: deleteInventory } = useDeleteManagerInventory();
+  const [addStockDialogOpen, setAddStockDialogOpen] = useState(false);
+  const [editingInventory, setEditingInventory] =
+    useState<ManagerInventory | null>(null);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [inventoryToTransfer, setInventoryToTransfer] =
+    useState<ManagerInventory | null>(null);
+  const [allocationsViewOpen, setAllocationsViewOpen] = useState(false);
+  const [inventoryForAllocations, setInventoryForAllocations] =
+    useState<ManagerInventory | null>(null);
+  const [deleteInventoryDialogOpen, setDeleteInventoryDialogOpen] = useState(false);
+  const [inventoryToDelete, setInventoryToDelete] =
+    useState<ManagerInventory | null>(null);
+
+  // Suppliers handlers
+  const handleCreateSupplier = () => {
+    setEditingSupplier(null);
+    setSupplierFormOpen(true);
+  };
+
+  const handleEditSupplier = (supplier: Supplier) => {
+    setEditingSupplier(supplier);
+    setSupplierFormOpen(true);
+  };
+
+  const handleDeleteSupplierClick = (supplier: Supplier) => {
+    setSupplierToDelete(supplier);
+    setDeleteSupplierDialogOpen(true);
+  };
+
+  const handleDeleteSupplierConfirm = () => {
+    if (supplierToDelete) {
+      deleteSupplier(supplierToDelete.id);
+      setDeleteSupplierDialogOpen(false);
+      setSupplierToDelete(null);
+    }
+  };
+
+  // Drinks handlers
+  const handleCreateDrink = () => {
+    setEditingDrink(null);
+    setDrinkFormOpen(true);
+  };
+
+  const handleEditDrink = (drink: Drink) => {
+    setEditingDrink(drink);
+    setDrinkFormOpen(true);
+  };
+
+  const handleDeleteDrinkClick = (drink: Drink) => {
+    setDrinkToDelete(drink);
+    setDeleteDrinkDialogOpen(true);
+  };
+
+  const handleDeleteDrinkConfirm = () => {
+    if (drinkToDelete) {
+      deleteDrink(drinkToDelete.id);
+      setDeleteDrinkDialogOpen(false);
+      setDrinkToDelete(null);
+    }
+  };
+
+  // Inventory (Stock) handlers
+  const handleAddStock = () => {
+    setEditingInventory(null);
+    setAddStockDialogOpen(true);
+  };
+
+  const handleEditInventory = (item: ManagerInventory) => {
+    setEditingInventory(item);
+    setAddStockDialogOpen(true);
+  };
+
+  const handleTransferClick = (item: ManagerInventory) => {
+    setInventoryToTransfer(item);
+    setTransferDialogOpen(true);
+  };
+
+  const handleViewAllocations = (item: ManagerInventory) => {
+    setInventoryForAllocations(item);
+    setAllocationsViewOpen(true);
+  };
+
+  const handleDeleteInventoryClick = (item: ManagerInventory) => {
+    setInventoryToDelete(item);
+    setDeleteInventoryDialogOpen(true);
+  };
+
+  const handleDeleteInventoryConfirm = () => {
+    if (inventoryToDelete) {
+      deleteInventory(inventoryToDelete.id);
+      setDeleteInventoryDialogOpen(false);
+      setInventoryToDelete(null);
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-6 max-w-7xl">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Proveedores e Insumos
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Gestiona tus proveedores e inventario global de insumos
+          </p>
+        </div>
+      </div>
+
+      <Tabs defaultValue="suppliers" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="suppliers">Proveedores</TabsTrigger>
+          <TabsTrigger value="inventory">Insumos</TabsTrigger>
+          <TabsTrigger value="global-stock">Stock en Inventario Global</TabsTrigger>
+          <TabsTrigger value="bar-stock">Stock de Barras</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="suppliers" className="space-y-4">
+          <div className="flex justify-end">
+            <Button onClick={handleCreateSupplier}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo proveedor
+            </Button>
+          </div>
+
+          {suppliers.length === 0 && !isLoadingSuppliers ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-16">
+                <p className="text-lg font-medium text-muted-foreground mb-4">
+                  No hay proveedores aún
+                </p>
+                <p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
+                  Comienza agregando tu primer proveedor. Podrás vincular recibos
+                  de stock a proveedores y rastrear devoluciones de consignación.
+                </p>
+                <Button onClick={handleCreateSupplier}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar tu primer proveedor
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <SuppliersTable
+              suppliers={suppliers}
+              isLoading={isLoadingSuppliers}
+              onEdit={handleEditSupplier}
+              onDelete={handleDeleteSupplierClick}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="inventory" className="space-y-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-semibold">Insumos Definidos</h2>
+              <p className="text-sm text-muted-foreground">
+                Define los insumos (bebidas) que usarás en tu inventario
+              </p>
+            </div>
+            <Button onClick={handleCreateDrink}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Insumo
+            </Button>
+          </div>
+
+          {drinks.length === 0 && !isLoadingDrinks ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <p className="text-lg font-medium text-muted-foreground mb-4">
+                  No hay insumos definidos aún
+                </p>
+                <p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
+                  Primero define los insumos (bebidas) que usarás. Luego podrás
+                  agregar stock de esos insumos.
+                </p>
+                <Button onClick={handleCreateDrink}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Crear tu primer insumo
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <DrinksTable
+              drinks={drinks}
+              isLoading={isLoadingDrinks}
+              onEdit={handleEditDrink}
+              onDelete={handleDeleteDrinkClick}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="global-stock" className="space-y-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-semibold">Stock en Inventario Global</h2>
+              <p className="text-sm text-muted-foreground">
+                Registra las compras de insumos que has realizado
+              </p>
+            </div>
+            <Button onClick={handleAddStock} disabled={drinks.length === 0}>
+              <Plus className="mr-2 h-4 w-4" />
+              Agregar Stock
+            </Button>
+          </div>
+
+          {inventory.length === 0 && !isLoadingInventory ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <p className="text-lg font-medium text-muted-foreground mb-4">
+                  No hay stock en inventario global
+                </p>
+                <p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
+                  Registra las compras de insumos que has realizado. Luego podrás
+                  transferirlos a las barras de tus eventos.
+                </p>
+                <Button onClick={handleAddStock} disabled={drinks.length === 0}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar tu primer stock
+                </Button>
+                {drinks.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Primero debes crear al menos un insumo
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <InventoryTable
+              inventory={inventory}
+              isLoading={isLoadingInventory}
+              onEdit={handleEditInventory}
+              onDelete={handleDeleteInventoryClick}
+              onTransfer={handleTransferClick}
+              onViewAllocations={handleViewAllocations}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="bar-stock" className="space-y-4">
+          <BarStockManagement />
+        </TabsContent>
+      </Tabs>
+
+      {/* Suppliers Dialogs */}
+      <SupplierFormDialog
+        supplier={editingSupplier}
+        open={supplierFormOpen}
+        onOpenChange={setSupplierFormOpen}
+      />
+
+      <Dialog
+        open={deleteSupplierDialogOpen}
+        onOpenChange={setDeleteSupplierDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar Proveedor</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que quieres eliminar "{supplierToDelete?.name}"?
+              Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteSupplierDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteSupplierConfirm}>
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Drinks Dialogs */}
+      <DrinkFormDialog
+        drink={editingDrink}
+        open={drinkFormOpen}
+        onOpenChange={setDrinkFormOpen}
+      />
+
+      <Dialog
+        open={deleteDrinkDialogOpen}
+        onOpenChange={setDeleteDrinkDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar Insumo</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que quieres eliminar "{drinkToDelete?.name}"? Esta acción
+              no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDrinkDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteDrinkConfirm}>
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Inventory (Stock) Dialogs */}
+      <AddStockDialog
+        inventory={editingInventory}
+        open={addStockDialogOpen}
+        onOpenChange={setAddStockDialogOpen}
+      />
+
+      {inventoryToTransfer && (
+        <TransferToBarDialog
+          inventory={inventoryToTransfer}
+          open={transferDialogOpen}
+          onOpenChange={setTransferDialogOpen}
+        />
+      )}
+
+      {inventoryForAllocations && (
+        <InventoryAllocationsView
+          inventory={inventoryForAllocations}
+          open={allocationsViewOpen}
+          onOpenChange={setAllocationsViewOpen}
+        />
+      )}
+
+      <Dialog
+        open={deleteInventoryDialogOpen}
+        onOpenChange={setDeleteInventoryDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar Insumo</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que quieres eliminar este insumo del inventario?
+              Solo puedes eliminar insumos que no tengan cantidades asignadas.
+              Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteInventoryDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteInventoryConfirm}>
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
