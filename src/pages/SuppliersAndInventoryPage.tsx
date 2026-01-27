@@ -11,21 +11,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useSuppliers, useDeleteSupplier } from '@/hooks/useSuppliers';
-import {
-  useManagerInventory,
-  useDeleteManagerInventory,
-} from '@/hooks/useManagerInventory';
+import { useGlobalInventory, useDeleteGlobalInventory } from '@/hooks/useGlobalInventory';
 import { SuppliersTable } from '@/components/suppliers/SuppliersTable';
 import { SupplierFormDialog } from '@/components/suppliers/SupplierFormDialog';
 import { DrinksTable } from '@/components/inventory/DrinksTable';
-import { InventoryTable } from '@/components/inventory/InventoryTable';
+import { StockTable } from '@/components/inventory/StockTable';
 import { DrinkFormDialog } from '@/components/inventory/DrinkFormDialog';
 import { AddStockDialog } from '@/components/inventory/AddStockDialog';
-import { TransferToBarDialog } from '@/components/inventory/TransferToBarDialog';
-import { InventoryAllocationsView } from '@/components/inventory/InventoryAllocationsView';
-import { BarStockManagement } from '@/components/inventory/BarStockManagement';
+import { AssignStockDialog } from '@/components/inventory/AssignStockDialog';
 import { useDrinks, useDeleteDrink } from '@/hooks/useDrinks';
-import type { Supplier, ManagerInventory, Drink } from '@/lib/api/types';
+import type { Supplier, GlobalInventory, Drink } from '@/lib/api/types';
 import { Plus } from 'lucide-react';
 
 export function SuppliersAndInventoryPage() {
@@ -45,22 +40,16 @@ export function SuppliersAndInventoryPage() {
   const [deleteDrinkDialogOpen, setDeleteDrinkDialogOpen] = useState(false);
   const [drinkToDelete, setDrinkToDelete] = useState<Drink | null>(null);
 
-  // Inventory (Stock) state
-  const { data: inventory = [], isLoading: isLoadingInventory } =
-    useManagerInventory();
-  const { mutate: deleteInventory } = useDeleteManagerInventory();
+  // Global Inventory (Stock) state
+  const { data: globalInventory = [], isLoading: isLoadingInventory } =
+    useGlobalInventory();
+  const { mutate: deleteInventory } = useDeleteGlobalInventory();
   const [addStockDialogOpen, setAddStockDialogOpen] = useState(false);
   const [editingInventory, setEditingInventory] =
-    useState<ManagerInventory | null>(null);
-  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
-  const [inventoryToTransfer, setInventoryToTransfer] =
-    useState<ManagerInventory | null>(null);
-  const [allocationsViewOpen, setAllocationsViewOpen] = useState(false);
-  const [inventoryForAllocations, setInventoryForAllocations] =
-    useState<ManagerInventory | null>(null);
+    useState<GlobalInventory | null>(null);
   const [deleteInventoryDialogOpen, setDeleteInventoryDialogOpen] = useState(false);
   const [inventoryToDelete, setInventoryToDelete] =
-    useState<ManagerInventory | null>(null);
+    useState<GlobalInventory | null>(null);
 
   // Suppliers handlers
   const handleCreateSupplier = () => {
@@ -110,28 +99,26 @@ export function SuppliersAndInventoryPage() {
     }
   };
 
-  // Inventory (Stock) handlers
+  // Global Inventory (Stock) handlers
   const handleAddStock = () => {
     setEditingInventory(null);
     setAddStockDialogOpen(true);
   };
 
-  const handleEditInventory = (item: ManagerInventory) => {
+  const handleEditInventory = (item: GlobalInventory) => {
     setEditingInventory(item);
     setAddStockDialogOpen(true);
   };
 
-  const handleTransferClick = (item: ManagerInventory) => {
-    setInventoryToTransfer(item);
-    setTransferDialogOpen(true);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [inventoryToAssign, setInventoryToAssign] = useState<GlobalInventory | null>(null);
+
+  const handleAssignToBar = (item: GlobalInventory) => {
+    setInventoryToAssign(item);
+    setAssignDialogOpen(true);
   };
 
-  const handleViewAllocations = (item: ManagerInventory) => {
-    setInventoryForAllocations(item);
-    setAllocationsViewOpen(true);
-  };
-
-  const handleDeleteInventoryClick = (item: ManagerInventory) => {
+  const handleDeleteInventoryClick = (item: GlobalInventory) => {
     setInventoryToDelete(item);
     setDeleteInventoryDialogOpen(true);
   };
@@ -162,7 +149,6 @@ export function SuppliersAndInventoryPage() {
           <TabsTrigger value="suppliers">Proveedores</TabsTrigger>
           <TabsTrigger value="inventory">Insumos</TabsTrigger>
           <TabsTrigger value="global-stock">Stock en Inventario Global</TabsTrigger>
-          <TabsTrigger value="bar-stock">Stock de Barras</TabsTrigger>
         </TabsList>
 
         <TabsContent value="suppliers" className="space-y-4">
@@ -253,7 +239,7 @@ export function SuppliersAndInventoryPage() {
             </Button>
           </div>
 
-          {inventory.length === 0 && !isLoadingInventory ? (
+          {globalInventory.length === 0 && !isLoadingInventory ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <p className="text-lg font-medium text-muted-foreground mb-4">
@@ -261,7 +247,7 @@ export function SuppliersAndInventoryPage() {
                 </p>
                 <p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
                   Registra las compras de insumos que has realizado. Luego podrás
-                  transferirlos a las barras de tus eventos.
+                  asignarlos a las barras de tus eventos.
                 </p>
                 <Button onClick={handleAddStock} disabled={drinks.length === 0}>
                   <Plus className="mr-2 h-4 w-4" />
@@ -275,19 +261,15 @@ export function SuppliersAndInventoryPage() {
               </CardContent>
             </Card>
           ) : (
-            <InventoryTable
-              inventory={inventory}
+            <StockTable
+              items={globalInventory}
               isLoading={isLoadingInventory}
+              mode="global"
+              onAssign={handleAssignToBar}
               onEdit={handleEditInventory}
               onDelete={handleDeleteInventoryClick}
-              onTransfer={handleTransferClick}
-              onViewAllocations={handleViewAllocations}
             />
           )}
-        </TabsContent>
-
-        <TabsContent value="bar-stock" className="space-y-4">
-          <BarStockManagement />
         </TabsContent>
       </Tabs>
 
@@ -364,22 +346,6 @@ export function SuppliersAndInventoryPage() {
         onOpenChange={setAddStockDialogOpen}
       />
 
-      {inventoryToTransfer && (
-        <TransferToBarDialog
-          inventory={inventoryToTransfer}
-          open={transferDialogOpen}
-          onOpenChange={setTransferDialogOpen}
-        />
-      )}
-
-      {inventoryForAllocations && (
-        <InventoryAllocationsView
-          inventory={inventoryForAllocations}
-          open={allocationsViewOpen}
-          onOpenChange={setAllocationsViewOpen}
-        />
-      )}
-
       <Dialog
         open={deleteInventoryDialogOpen}
         onOpenChange={setDeleteInventoryDialogOpen}
@@ -406,6 +372,17 @@ export function SuppliersAndInventoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {inventoryToAssign && (
+        <AssignStockDialog
+          inventory={inventoryToAssign}
+          open={assignDialogOpen}
+          onOpenChange={(open) => {
+            setAssignDialogOpen(open);
+            if (!open) setInventoryToAssign(null);
+          }}
+        />
+      )}
     </div>
   );
 }

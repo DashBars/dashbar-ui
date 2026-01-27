@@ -13,8 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useEvent, useStartEvent, useFinishEvent, useDeleteEvent } from '@/hooks/useEvents';
-import { StartEventButton } from '@/components/events/StartEventButton';
+import { useEvent, useActivateEvent, useFinishEvent, useDeleteEvent, useArchiveEvent } from '@/hooks/useEvents';
+import { ActivateEventDialog } from '@/components/events/ActivateEventDialog';
 import { FinishEventButton } from '@/components/events/FinishEventButton';
 import { BarsPageHeader } from '@/components/bars/BarsPageHeader';
 import { BarsSummaryCards } from '@/components/bars/BarsSummaryCards';
@@ -24,16 +24,11 @@ import { BarFormDialog } from '@/components/bars/BarFormDialog';
 import { BarDetailsSheet } from '@/components/bars/BarDetailsSheet';
 import { useBars } from '@/hooks/useBars';
 import type { EventStatus, Bar, BarType, BarStatus } from '@/lib/api/types';
-import { ChevronRight, Calendar, MapPin, Trash2 } from 'lucide-react';
+import { ChevronRight, Calendar, MapPin, Trash2, Play } from 'lucide-react';
 
-function getEventStatus(event: any): EventStatus {
-  if (event.finishedAt) {
-    return 'finished';
-  }
-  if (event.startedAt) {
-    return 'active';
-  }
-  return 'upcoming';
+// Use persisted status from backend (source of truth)
+function getEventStatus(event: Event): EventStatus {
+  return event.status || 'upcoming'; // Fallback to upcoming if status is missing
 }
 
 function formatDate(dateString: string | null): string {
@@ -57,10 +52,11 @@ function StatusBadge({ status }: { status: EventStatus }) {
     upcoming: 'bg-blue-100 text-blue-800 border-blue-200',
     active: 'bg-green-100 text-green-800 border-green-200',
     finished: 'bg-gray-100 text-gray-800 border-gray-200',
+    archived: 'bg-purple-100 text-purple-800 border-purple-200',
   };
 
   return (
-    <Badge variant="outline" className={variants[status]}>
+    <Badge variant="outline" className={variants[status] || variants.upcoming}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   );
@@ -72,8 +68,11 @@ export function EventDetailsPage() {
   const eventIdNum = parseInt(eventId || '0', 10);
   const { data: event, isLoading } = useEvent(eventIdNum);
   const { mutate: deleteEvent } = useDeleteEvent();
+  const { mutate: archiveEvent } = useArchiveEvent();
   
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [activateDialogOpen, setActivateDialogOpen] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   
   // Bars state
   const { data: bars, isLoading: isLoadingBars } = useBars(eventIdNum);
@@ -92,8 +91,25 @@ export function EventDetailsPage() {
       const matchesSearch =
         bar.name.toLowerCase().includes(search.toLowerCase());
       const matchesType = typeFilter === 'all' || bar.type === typeFilter;
-      const matchesStatus =
-        statusFilter === 'all' || bar.status === statusFilter;
+      
+      // Fix: lowStock is a derived state, not exclusive
+      // If filtering by lowStock, show bars that are lowStock (they can also be open)
+      // If filtering by open, show open bars (including those that are also lowStock)
+      // If filtering by closed, show only closed bars
+      let matchesStatus = true;
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'lowStock') {
+          // Show bars with lowStock status
+          matchesStatus = bar.status === 'lowStock';
+        } else if (statusFilter === 'open') {
+          // Show open bars, including those that are also lowStock
+          matchesStatus = bar.status === 'open' || bar.status === 'lowStock';
+        } else {
+          // For closed, show only closed bars
+          matchesStatus = bar.status === statusFilter;
+        }
+      }
+      
       return matchesSearch && matchesType && matchesStatus;
     });
   }, [bars, search, typeFilter, statusFilter]);
@@ -114,12 +130,9 @@ export function EventDetailsPage() {
     setDetailsSheetOpen(true);
   };
 
-  const handleManageStock = (bar: Bar) => {
-    handleViewDetails(bar, 'stock');
-  };
-
-  const handleManageRecipes = (bar: Bar) => {
-    handleViewDetails(bar, 'recipes');
+  // Make bar rows clickable to manage
+  const handleBarClick = (bar: Bar) => {
+    handleViewDetails(bar);
   };
 
   if (isLoading) {
@@ -193,18 +206,40 @@ export function EventDetailsPage() {
         </div>
         <div className="flex gap-2">
           {status === 'upcoming' && (
-            <StartEventButton event={event} />
+            <>
+              <Button onClick={() => setActivateDialogOpen(true)}>
+                <Play className="mr-2 h-4 w-4" />
+                Activar Evento
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // Navigate to edit or open edit dialog
+                  // For now, just show a message
+                }}
+              >
+                Editar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteClick}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Eliminar
+              </Button>
+            </>
           )}
           {status === 'active' && (
             <FinishEventButton event={event} />
           )}
-          <Button
-            variant="destructive"
-            onClick={handleDeleteClick}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete Event
-          </Button>
+          {status === 'finished' && (
+            <Button
+              variant="outline"
+              onClick={() => setArchiveDialogOpen(true)}
+            >
+              Archivar
+            </Button>
+          )}
         </div>
       </div>
 
@@ -252,11 +287,9 @@ export function EventDetailsPage() {
                       Venue
                     </div>
                     <div className="text-base">{event.venue.name}</div>
-                    {event.venue.description && (
-                      <div className="text-sm text-muted-foreground mt-1">
-                        {event.venue.description}
-                      </div>
-                    )}
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {event.venue.address}, {event.venue.city}, {event.venue.country}
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -280,7 +313,7 @@ export function EventDetailsPage() {
             eventId={eventIdNum}
             eventName={event.name}
             onCreateBar={handleCreateBar}
-            isEventFinished={status === 'finished'}
+            isEventFinished={status === 'finished' || status === 'archived'}
           />
           <BarsSummaryCards bars={bars || []} isLoading={isLoadingBars} />
           <BarsFilters
@@ -291,14 +324,14 @@ export function EventDetailsPage() {
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
           />
-          <BarsTable
-            bars={filteredBars}
-            isLoading={isLoadingBars}
-            onViewDetails={handleViewDetails}
-            onEdit={handleEdit}
-            onManageStock={handleManageStock}
-            onManageRecipes={handleManageRecipes}
-          />
+              <BarsTable
+                bars={filteredBars}
+                isLoading={isLoadingBars}
+                onViewDetails={handleBarClick}
+                onEdit={handleEdit}
+                onManageStock={handleBarClick}
+                onManageRecipes={handleBarClick}
+              />
         </TabsContent>
 
         {status === 'finished' && (
@@ -334,14 +367,22 @@ export function EventDetailsPage() {
         />
       )}
 
+      {event && status === 'upcoming' && (
+        <ActivateEventDialog
+          event={event}
+          open={activateDialogOpen}
+          onOpenChange={setActivateDialogOpen}
+        />
+      )}
+
       {/* Delete Event Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Event</DialogTitle>
+            <DialogTitle>Eliminar Evento</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que quieres eliminar "{event?.name}"? Esta acción
-              no se puede deshacer y se eliminarán todos los datos asociados al evento.
+              ¿Estás seguro de que quieres eliminar "{event?.name}"? Esta acción no se puede deshacer.
+              Solo puedes eliminar eventos en estado "upcoming".
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -353,6 +394,40 @@ export function EventDetailsPage() {
             </Button>
             <Button variant="destructive" onClick={handleDeleteConfirm}>
               Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Archive Event Dialog */}
+      <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Archivar Evento</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que quieres archivar "{event?.name}"? Solo puedes archivar eventos finalizados.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setArchiveDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (event) {
+                  archiveEvent(event.id, {
+                    onSuccess: () => {
+                      setArchiveDialogOpen(false);
+                      navigate('/events');
+                    },
+                  });
+                }
+              }}
+            >
+              Archivar
             </Button>
           </DialogFooter>
         </DialogContent>

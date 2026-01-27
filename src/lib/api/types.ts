@@ -230,61 +230,93 @@ export interface InventoryMovement {
 }
 
 // Event types
-export type EventStatus = 'upcoming' | 'active' | 'finished';
-
-export interface Venue {
-  id: number;
-  name: string;
-  description?: string;
-  address: string;
-  city: string;
-  country: string;
-  capacity: number;
-  ownerId?: number;
-}
-
-export interface CreateVenueDto {
-  name: string;
-  description?: string;
-  address: string;
-  city: string;
-  country: string;
-  capacity: number;
-}
-
-export interface UpdateVenueDto {
-  name?: string;
-  description?: string;
-  address?: string;
-  city?: string;
-  country?: string;
-  capacity?: number;
-}
+export type EventStatus = 'upcoming' | 'active' | 'finished' | 'archived';
 
 export interface Event {
   id: number;
   name: string;
   description?: string;
-  startedAt: string | null;
+  status: EventStatus; // Estado persistido
+  scheduledStartAt: string | null; // Fecha/hora programada
+  startedAt: string | null; // Actual start time (manual)
   finishedAt: string | null;
+  archivedAt: string | null; // Fecha de archivado
   stockDepletionPolicy: 'cheapest_first' | 'fifo' | 'consignment_last';
   ownerId: number;
   venueId: number;
   venue?: Venue;
 }
 
+export type VenueType = 'outdoor' | 'indoor' | 'nose';
+
+export interface Venue {
+  id: number;
+  name: string;
+  address: string;
+  addressLine2?: string;
+  city: string;
+  state?: string;
+  country: string;
+  postalCode?: string;
+  capacity: number;
+  venueType: VenueType;
+  placeId?: string;
+  lat?: number;
+  lng?: number;
+  formattedAddress?: string;
+  ownerId?: number;
+}
+
+export interface CreateVenueDto {
+  name: string;
+  address: string;
+  addressLine2?: string;
+  city: string;
+  state?: string;
+  country: string;
+  postalCode?: string;
+  capacity: number;
+  venueType?: VenueType;
+  placeId?: string;
+  lat?: number;
+  lng?: number;
+  formattedAddress?: string;
+}
+
+export interface UpdateVenueDto {
+  name?: string;
+  address?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  capacity?: number;
+  venueType?: VenueType;
+  placeId?: string;
+  lat?: number;
+  lng?: number;
+  formattedAddress?: string;
+}
+
+// Event interface already defined above with status
+
 export interface CreateEventDto {
   name: string;
   description?: string;
   venueId: number;
-  startedAt?: string;
+  scheduledStartAt?: string; // Fecha/hora programada (debe ser futura)
 }
 
 export interface UpdateEventDto {
   name?: string;
   description?: string;
   venueId?: number;
-  startedAt?: string;
+  scheduledStartAt?: string; // Fecha/hora programada (debe ser futura)
+}
+
+export interface ActivateEventDto {
+  barIds?: number[]; // Si vacío/null = todas las barras
 }
 
 // Manager Inventory types
@@ -313,6 +345,68 @@ export interface ManagerInventoryAllocation {
   allocatedAt: string;
   event: Event;
   bar: Bar;
+}
+
+// Global Inventory types (replaces ManagerInventory)
+export interface GlobalInventory {
+  id: number;
+  ownerId: number;
+  drinkId: number;
+  supplierId: number | null;
+  ownershipMode: OwnershipMode;
+  totalQuantity: number;
+  allocatedQuantity: number;
+  unitCost: number;
+  currency: string;
+  sku: string | null;
+  receivedAt: string;
+  lastUpdatedAt: string;
+  drink: Drink;
+  supplier: Supplier | null;
+}
+
+export interface CreateGlobalInventoryDto {
+  drinkId: number;
+  supplierId?: number;
+  totalQuantity: number;
+  unitCost: number; // Costo unitario en centavos
+  currency?: string;
+  sku?: string;
+  ownershipMode?: OwnershipMode;
+}
+
+export interface UpdateGlobalInventoryDto {
+  totalQuantity?: number;
+  unitCost?: number; // Costo unitario en centavos
+  currency?: string;
+  sku?: string;
+  ownershipMode?: OwnershipMode;
+}
+
+// Stock Movement DTOs
+export interface AssignStockDto {
+  globalInventoryId: number;
+  eventId: number;
+  barId: number;
+  quantity: number;
+  notes?: string;
+}
+
+export interface MoveStockDto {
+  eventId: number;
+  fromBarId: number;
+  toBarId: number;
+  drinkId: number;
+  quantity: number;
+  notes?: string;
+}
+
+export interface ReturnStockDto {
+  eventId: number;
+  barId: number;
+  drinkId: number;
+  quantity: number;
+  notes?: string;
 }
 
 export interface CreateManagerInventoryDto {

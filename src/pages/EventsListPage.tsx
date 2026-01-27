@@ -32,21 +32,9 @@ import { useEvents } from '@/hooks/useEvents';
 import { EventFormDialog } from '@/components/events/EventFormDialog';
 import type { Event, EventStatus } from '@/lib/api/types';
 import { Plus } from 'lucide-react';
+// Use persisted status from backend (source of truth)
 function getEventStatus(event: Event): EventStatus {
-  if (event.finishedAt) {
-    return 'finished';
-  }
-  if (event.startedAt) {
-    const startedAtDate = new Date(event.startedAt);
-    const now = new Date();
-    // If startedAt is in the past or present, event is active
-    if (startedAtDate <= now) {
-      return 'active';
-    }
-    // If startedAt is in the future, it's still upcoming (scheduled)
-    return 'upcoming';
-  }
-  return 'upcoming';
+  return event.status || 'upcoming'; // Fallback to upcoming if status is missing
 }
 
 function formatDate(dateString: string | null): string {
@@ -70,10 +58,11 @@ function StatusBadge({ status }: { status: EventStatus }) {
     upcoming: 'bg-blue-100 text-blue-800 border-blue-200',
     active: 'bg-green-100 text-green-800 border-green-200',
     finished: 'bg-gray-100 text-gray-800 border-gray-200',
+    archived: 'bg-purple-100 text-purple-800 border-purple-200',
   };
 
   return (
-    <Badge variant="outline" className={variants[status]}>
+    <Badge variant="outline" className={variants[status] || variants.upcoming}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   );
@@ -145,6 +134,7 @@ export function EventsListPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Venue</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Start</TableHead>
                     <TableHead>End</TableHead>
@@ -155,6 +145,9 @@ export function EventsListPage() {
                     <TableRow key={i}>
                       <TableCell>
                         <Skeleton className="h-4 w-48" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-32" />
                       </TableCell>
                       <TableCell>
                         <Skeleton className="h-5 w-20" />
@@ -235,6 +228,7 @@ export function EventsListPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Venue</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Start</TableHead>
                     <TableHead>End</TableHead>
@@ -243,7 +237,7 @@ export function EventsListPage() {
                 <TableBody>
                   {filteredEvents.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                      <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                         No events found
                       </TableCell>
                     </TableRow>
@@ -257,6 +251,9 @@ export function EventsListPage() {
                           onClick={() => handleRowClick(event)}
                         >
                           <TableCell className="font-medium">{event.name}</TableCell>
+                          <TableCell>
+                            {event.venue?.name || '-'}
+                          </TableCell>
                           <TableCell>
                             <StatusBadge status={status} />
                           </TableCell>

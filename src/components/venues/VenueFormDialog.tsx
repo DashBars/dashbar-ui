@@ -10,9 +10,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useCreateVenue, useUpdateVenue } from '@/hooks/useVenues';
-import type { Venue, CreateVenueDto, UpdateVenueDto } from '@/lib/api/types';
+import type { Venue, CreateVenueDto, UpdateVenueDto, VenueType } from '@/lib/api/types';
 import { Loader2 } from 'lucide-react';
 
 interface VenueFormDialogProps {
@@ -33,20 +39,26 @@ export function VenueFormDialog({
   );
 
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
+  const [addressLine2, setAddressLine2] = useState('');
   const [city, setCity] = useState('');
+  const [state, setState] = useState('');
   const [country, setCountry] = useState('');
+  const [postalCode, setPostalCode] = useState('');
   const [capacity, setCapacity] = useState<string>('');
+  const [venueType, setVenueType] = useState<VenueType>('nose');
 
   useEffect(() => {
     if (open) {
       setName(venue?.name || '');
-      setDescription(venue?.description || '');
       setAddress(venue?.address || '');
+      setAddressLine2(venue?.addressLine2 || '');
       setCity(venue?.city || '');
+      setState(venue?.state || '');
       setCountry(venue?.country || '');
+      setPostalCode(venue?.postalCode || '');
       setCapacity(venue?.capacity?.toString() || '');
+      setVenueType(venue?.venueType || 'nose');
     }
   }, [open, venue]);
 
@@ -56,11 +68,14 @@ export function VenueFormDialog({
     if (isEdit) {
       const dto: UpdateVenueDto = {
         name,
-        description: description || undefined,
         address,
+        addressLine2: addressLine2 || undefined,
         city,
+        state: state || undefined,
         country,
+        postalCode: postalCode || undefined,
         capacity: capacity ? parseInt(capacity, 10) : undefined,
+        venueType,
       };
       updateVenue(dto, {
         onSuccess: () => onOpenChange(false),
@@ -68,11 +83,14 @@ export function VenueFormDialog({
     } else {
       const dto: CreateVenueDto = {
         name,
-        description: description || undefined,
         address,
+        addressLine2: addressLine2 || undefined,
         city,
+        state: state || undefined,
         country,
+        postalCode: postalCode || undefined,
         capacity: parseInt(capacity, 10),
+        venueType,
       };
       createVenue(dto, {
         onSuccess: () => onOpenChange(false),
@@ -109,17 +127,6 @@ export function VenueFormDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={isSubmitting}
-                placeholder="Optional description"
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="address">
                 Address <span className="text-destructive">*</span>
               </Label>
@@ -130,6 +137,16 @@ export function VenueFormDialog({
                 required
                 disabled={isSubmitting}
                 placeholder="Street address"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="addressLine2">Address Line 2</Label>
+              <Input
+                id="addressLine2"
+                value={addressLine2}
+                onChange={(e) => setAddressLine2(e.target.value)}
+                disabled={isSubmitting}
+                placeholder="Apartment, suite, etc. (optional)"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -147,6 +164,18 @@ export function VenueFormDialog({
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="state">State/Province</Label>
+                <Input
+                  id="state"
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  disabled={isSubmitting}
+                  placeholder="State or province"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="country">
                   Country <span className="text-destructive">*</span>
                 </Label>
@@ -159,6 +188,33 @@ export function VenueFormDialog({
                   placeholder="Country"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="postalCode">Postal Code</Label>
+                <Input
+                  id="postalCode"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  disabled={isSubmitting}
+                  placeholder="Postal code"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="venueType">Venue Type</Label>
+              <Select
+                value={venueType}
+                onValueChange={(value) => setVenueType(value as VenueType)}
+                disabled={isSubmitting}
+              >
+                <SelectTrigger id="venueType">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="outdoor">Outdoor</SelectItem>
+                  <SelectItem value="indoor">Indoor</SelectItem>
+                  <SelectItem value="nose">No especificado</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="capacity">

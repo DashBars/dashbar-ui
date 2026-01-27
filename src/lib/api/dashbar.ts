@@ -24,6 +24,7 @@ import type {
   Event,
   CreateEventDto,
   UpdateEventDto,
+  ActivateEventDto,
   Venue,
   CreateVenueDto,
   UpdateVenueDto,
@@ -34,6 +35,12 @@ import type {
   TransferToBarDto,
   CreateDrinkDto,
   UpdateDrinkDto,
+  GlobalInventory,
+  CreateGlobalInventoryDto,
+  UpdateGlobalInventoryDto,
+  AssignStockDto,
+  MoveStockDto,
+  ReturnStockDto,
 } from './types';
 
 // Configure axios base URL - adjust this to match your backend URL
@@ -340,6 +347,16 @@ export const managerInventoryApi = {
 };
 
 // Drinks API
+export const globalInventoryApi = {
+  getAll: () => api.get<GlobalInventory[]>('/global-inventory'),
+  getOne: (id: number) => api.get<GlobalInventory>(`/global-inventory/${id}`),
+  create: (dto: CreateGlobalInventoryDto) =>
+    api.post<GlobalInventory>('/global-inventory', dto),
+  update: (id: number, dto: UpdateGlobalInventoryDto) =>
+    api.patch<GlobalInventory>(`/global-inventory/${id}`, dto),
+  delete: (id: number) => api.delete(`/global-inventory/${id}`),
+};
+
 export const drinksApi = {
   findAll: async (): Promise<Drink[]> => {
     const response = await api.get<Drink[]>('/drinks');
@@ -452,8 +469,34 @@ export const eventsApi = {
     return response.data;
   },
 
+  activateEvent: async (id: number, dto: ActivateEventDto): Promise<Event> => {
+    const response = await api.post<Event>(`/events/${id}/activate`, dto);
+    return response.data;
+  },
+
   finishEvent: async (id: number): Promise<Event> => {
     const response = await api.post<Event>(`/events/${id}/finish`);
+    return response.data;
+  },
+
+  archiveEvent: async (id: number): Promise<Event> => {
+    const response = await api.post<Event>(`/events/${id}/archive`);
+    return response.data;
+  },
+};
+
+// Stock Movements API
+export const stockMovementsApi = {
+  assign: async (dto: AssignStockDto) => {
+    const response = await api.post('/stock/assign', dto);
+    return response.data;
+  },
+  move: async (dto: MoveStockDto) => {
+    const response = await api.post('/stock/move', dto);
+    return response.data;
+  },
+  return: async (dto: ReturnStockDto) => {
+    const response = await api.post('/stock/return', dto);
     return response.data;
   },
 };

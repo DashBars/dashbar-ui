@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,19 @@ export function VenuesPage() {
   const [editingVenue, setEditingVenue] = useState<Venue | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [venueToDelete, setVenueToDelete] = useState<Venue | null>(null);
+  const [search, setSearch] = useState('');
+
+  const filteredVenues = useMemo(() => {
+    if (!search) return venues;
+    const lowerSearch = search.toLowerCase();
+    return venues.filter(
+      (v) =>
+        v.name.toLowerCase().includes(lowerSearch) ||
+        v.city.toLowerCase().includes(lowerSearch) ||
+        v.country.toLowerCase().includes(lowerSearch) ||
+        v.address.toLowerCase().includes(lowerSearch),
+    );
+  }, [venues, search]);
 
   const handleCreate = () => {
     setEditingVenue(null);
@@ -77,16 +91,24 @@ export function VenuesPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="rounded-2xl border shadow-sm">
-          <CardContent className="p-0">
-            <VenuesTable
-              venues={venues}
-              isLoading={isLoading}
-              onEdit={handleEdit}
-              onDelete={handleDeleteClick}
-            />
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Input
+            placeholder="Search venues by name, city, country, or address..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-sm"
+          />
+          <Card className="rounded-2xl border shadow-sm">
+            <CardContent className="p-0">
+              <VenuesTable
+                venues={filteredVenues}
+                isLoading={isLoading}
+                onEdit={handleEdit}
+                onDelete={handleDeleteClick}
+              />
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <VenueFormDialog
@@ -98,10 +120,19 @@ export function VenuesPage() {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Venue</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{venueToDelete?.name}"? This action
-              cannot be undone. If this venue has associated events, the deletion will fail.
+            <DialogTitle>Eliminar Venue</DialogTitle>
+            <DialogDescription className="space-y-2">
+              <p>
+                ¿Estás seguro de que quieres eliminar "{venueToDelete?.name}"?
+              </p>
+              <p className="text-sm text-muted-foreground">
+                <strong>Restricciones:</strong> Solo puedes eliminar un venue si no tiene eventos asignados,
+                o si todos sus eventos están en estado "upcoming". Si tiene eventos activos o finalizados,
+                primero debes eliminarlos o archivarlos.
+              </p>
+              <p className="text-sm text-destructive font-medium">
+                Esta acción no se puede deshacer.
+              </p>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -109,10 +140,10 @@ export function VenuesPage() {
               variant="outline"
               onClick={() => setDeleteDialogOpen(false)}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button variant="destructive" onClick={handleDeleteConfirm}>
-              Delete
+              Eliminar
             </Button>
           </DialogFooter>
         </DialogContent>

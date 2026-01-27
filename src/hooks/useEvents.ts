@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { eventsApi } from '@/lib/api/dashbar';
-import type { CreateEventDto, UpdateEventDto } from '@/lib/api/types';
+import type { CreateEventDto, UpdateEventDto, ActivateEventDto } from '@/lib/api/types';
 import { toast } from 'sonner';
 
 export const eventsKeys = {
@@ -88,6 +88,23 @@ export function useStartEvent() {
   });
 }
 
+export function useActivateEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dto }: { id: number; dto: ActivateEventDto }) =>
+      eventsApi.activateEvent(id, dto),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: eventsKeys.list() });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.detail(id) });
+      toast.success('Event activated successfully');
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || error.message || 'Error activating event';
+      toast.error(errorMessage);
+    },
+  });
+}
+
 export function useFinishEvent() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -99,6 +116,22 @@ export function useFinishEvent() {
     },
     onError: (error: any) => {
       const errorMessage = error.response?.data?.message || error.message || 'Error finishing event';
+      toast.error(errorMessage);
+    },
+  });
+}
+
+export function useArchiveEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => eventsApi.archiveEvent(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: eventsKeys.list() });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.detail(id) });
+      toast.success('Event archived successfully');
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || error.message || 'Error archiving event';
       toast.error(errorMessage);
     },
   });

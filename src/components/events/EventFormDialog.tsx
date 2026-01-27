@@ -45,35 +45,32 @@ export function EventFormDialog({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [venueId, setVenueId] = useState<string>('');
-  const [startedAt, setStartedAt] = useState<string>('');
+  const [scheduledDate, setScheduledDate] = useState<string>('');
+  const [scheduledTime, setScheduledTime] = useState<string>('');
 
   useEffect(() => {
     if (open) {
       setName(event?.name || '');
       setDescription(event?.description || '');
       setVenueId(event?.venueId?.toString() || '');
-      // Convert ISO string to datetime-local format (YYYY-MM-DDTHH:mm)
-      // Only show if event hasn't been manually started (i.e., if it's still upcoming)
-      if (event?.startedAt) {
-        const date = new Date(event.startedAt);
-        const now = new Date();
-        // Only allow editing if the date is in the future (scheduled date)
-        if (date > now) {
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const day = String(date.getDate()).padStart(2, '0');
-          const hours = String(date.getHours()).padStart(2, '0');
-          const minutes = String(date.getMinutes()).padStart(2, '0');
-          setStartedAt(`${year}-${month}-${day}T${hours}:${minutes}`);
-        } else {
-          // Event has been manually started, don't show the field
-          setStartedAt('');
-        }
+      
+      // Parse scheduledStartAt into date and time
+      if (event?.scheduledStartAt) {
+        const date = new Date(event.scheduledStartAt);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        setScheduledDate(`${year}-${month}-${day}`);
+        setScheduledTime(`${hours}:${minutes}`);
       } else {
-        setStartedAt('');
+        setScheduledDate('');
+        setScheduledTime('');
       }
     } else {
-      setStartedAt('');
+      setScheduledDate('');
+      setScheduledTime('');
     }
   }, [open, event]);
 
@@ -85,12 +82,27 @@ export function EventFormDialog({
       return;
     }
 
+    // Combine date and time into ISO string
+    const scheduledStartAt = scheduledDate && scheduledTime
+      ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
+      : undefined;
+
+    // Validate that scheduled start is in the future
+    if (scheduledStartAt) {
+      const scheduledDateObj = new Date(scheduledStartAt);
+      const now = new Date();
+      if (scheduledDateObj <= now) {
+        toast.error('Scheduled start time must be in the future');
+        return;
+      }
+    }
+
     if (isEdit) {
       const dto: UpdateEventDto = {
         name,
         description: description || undefined,
         venueId: venueId ? parseInt(venueId, 10) : undefined,
-        startedAt: startedAt ? new Date(startedAt).toISOString() : undefined,
+        scheduledStartAt,
       };
       updateEvent(dto, {
         onSuccess: () => onOpenChange(false),
@@ -100,7 +112,7 @@ export function EventFormDialog({
         name,
         description: description || undefined,
         venueId: parseInt(venueId, 10),
-        startedAt: startedAt ? new Date(startedAt).toISOString() : undefined,
+        scheduledStartAt,
       };
       createEvent(dto, {
         onSuccess: () => onOpenChange(false),
@@ -170,19 +182,32 @@ export function EventFormDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="startedAt">Scheduled Start Date & Time</Label>
-              <Input
-                id="startedAt"
-                type="datetime-local"
-                value={startedAt}
-                onChange={(e) => setStartedAt(e.target.value)}
-                disabled={isSubmitting || (isEdit && event?.startedAt && new Date(event.startedAt) <= new Date())}
-              />
-              <p className="text-xs text-muted-foreground">
-                Optional. The event will remain "upcoming" until you manually start it. When you start it, this will be overwritten with the actual start time.
-              </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="scheduledDate">Scheduled Start Date</Label>
+                <Input
+                  id="scheduledDate"
+                  type="date"
+                  value={scheduledDate}
+                  onChange={(e) => setScheduledDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]} // No dates in the past
+                  disabled={isSubmitting || (isEdit && event?.status !== 'upcoming')}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="scheduledTime">Scheduled Start Time</Label>
+                <Input
+                  id="scheduledTime"
+                  type="time"
+                  value={scheduledTime}
+                  onChange={(e) => setScheduledTime(e.target.value)}
+                  disabled={isSubmitting || (isEdit && event?.status !== 'upcoming')}
+                />
+              </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Optional. The event will remain "upcoming" until you manually activate it. When you activate it, the actual start time will be recorded.
+            </p>
           </div>
           <DialogFooter>
             <Button

@@ -98,7 +98,11 @@ export function BarsTable({
           </TableHeader>
           <TableBody>
             {bars.map((bar) => (
-              <TableRow key={bar.id}>
+              <TableRow
+                key={bar.id}
+                className="cursor-pointer hover:bg-muted/50"
+                onClick={() => onViewDetails(bar)}
+              >
                 <TableCell className="font-medium">{bar.name}</TableCell>
                 <TableCell>
                   <Badge variant={barTypeColors[bar.type] || 'default'}>
@@ -127,32 +131,13 @@ export function BarsTable({
                   )}
                 </TableCell>
                 <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Open menu</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onViewDetails(bar)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        View details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onEdit(bar)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onManageStock(bar)}>
-                        <Package className="mr-2 h-4 w-4" />
-                        Manage stock
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onManageRecipes(bar)}>
-                        <ChefHat className="mr-2 h-4 w-4" />
-                        Manage recipes
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button
+                    variant="ghost"
+                    onClick={() => onViewDetails(bar)}
+                    className="h-8"
+                  >
+                    Gestionar
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

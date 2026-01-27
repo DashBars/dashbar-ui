@@ -18,20 +18,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  useCreateManagerInventory,
-  useUpdateManagerInventory,
-} from '@/hooks/useManagerInventory';
+  useCreateGlobalInventory,
+  useUpdateGlobalInventory,
+} from '@/hooks/useGlobalInventory';
 import { useDrinks } from '@/hooks/useDrinks';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import type {
-  ManagerInventory,
-  CreateManagerInventoryDto,
-  UpdateManagerInventoryDto,
+  GlobalInventory,
+  CreateGlobalInventoryDto,
+  UpdateGlobalInventoryDto,
+  OwnershipMode,
 } from '@/lib/api/types';
 import { Loader2 } from 'lucide-react';
 
 interface AddStockDialogProps {
-  inventory?: ManagerInventory | null;
+  inventory?: GlobalInventory | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -43,9 +44,9 @@ export function AddStockDialog({
 }: AddStockDialogProps) {
   const isEdit = !!inventory;
   const { mutate: createInventory, isPending: isCreating } =
-    useCreateManagerInventory();
+    useCreateGlobalInventory();
   const { mutate: updateInventory, isPending: isUpdating } =
-    useUpdateManagerInventory(inventory?.id || 0);
+    useUpdateGlobalInventory(inventory?.id || 0);
 
   const { data: drinks = [], isLoading: isLoadingDrinks } = useDrinks();
   const { data: suppliers = [], isLoading: isLoadingSuppliers } = useSuppliers();
@@ -56,16 +57,18 @@ export function AddStockDialog({
   const [unitCost, setUnitCost] = useState<string>('');
   const [currency, setCurrency] = useState<string>('ARS');
   const [sku, setSku] = useState<string>('');
+  const [ownershipMode, setOwnershipMode] = useState<OwnershipMode>('purchased');
 
   useEffect(() => {
     if (open) {
       if (isEdit && inventory) {
         setDrinkId(inventory.drinkId.toString());
-        setSupplierId(inventory.supplierId.toString());
+        setSupplierId(inventory.supplierId?.toString() || '');
         setTotalQuantity(inventory.totalQuantity.toString());
         setUnitCost((inventory.unitCost / 100).toFixed(2)); // Convertir de centavos a unidades
         setCurrency(inventory.currency || 'ARS');
         setSku(inventory.sku || '');
+        setOwnershipMode(inventory.ownershipMode);
       } else {
         setDrinkId('');
         setSupplierId('');
@@ -73,6 +76,7 @@ export function AddStockDialog({
         setUnitCost('');
         setCurrency('ARS');
         setSku('');
+        setOwnershipMode('purchased');
       }
     }
   }, [open, inventory, isEdit]);
@@ -81,23 +85,25 @@ export function AddStockDialog({
     e.preventDefault();
 
     if (isEdit) {
-      const dto: UpdateManagerInventoryDto = {
+      const dto: UpdateGlobalInventoryDto = {
         totalQuantity: totalQuantity ? parseInt(totalQuantity, 10) : undefined,
         unitCost: unitCost ? Math.round(parseFloat(unitCost) * 100) : undefined, // Convertir a centavos
         currency: currency || undefined,
         sku: sku || undefined,
+        ownershipMode: ownershipMode,
       };
       updateInventory(dto, {
         onSuccess: () => onOpenChange(false),
       });
     } else {
-      const dto: CreateManagerInventoryDto = {
+      const dto: CreateGlobalInventoryDto = {
         drinkId: parseInt(drinkId, 10),
-        supplierId: parseInt(supplierId, 10),
+        supplierId: supplierId ? parseInt(supplierId, 10) : undefined,
         totalQuantity: parseInt(totalQuantity, 10),
         unitCost: Math.round(parseFloat(unitCost) * 100), // Convertir a centavos para almacenar
         currency: currency,
         sku: sku || undefined,
+        ownershipMode: ownershipMode,
       };
       createInventory(dto, {
         onSuccess: () => onOpenChange(false),
@@ -152,18 +158,17 @@ export function AddStockDialog({
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="supplierId">
-                    Proveedor <span className="text-destructive">*</span>
-                  </Label>
+                  <Label htmlFor="supplierId">Proveedor</Label>
                   <Select
                     value={supplierId}
                     onValueChange={setSupplierId}
                     disabled={isSubmitting || isLoadingSuppliers}
                   >
                     <SelectTrigger id="supplierId">
-                      <SelectValue placeholder="Seleccionar proveedor" />
+                      <SelectValue placeholder="Seleccionar proveedor (opcional)" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="">Sin proveedor</SelectItem>
                       {suppliers.map((supplier) => (
                         <SelectItem key={supplier.id} value={supplier.id.toString()}>
                           {supplier.name}
@@ -171,8 +176,32 @@ export function AddStockDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Opcional. Puedes agregar stock sin asociarlo a un proveedor.
+                  </p>
                 </div>
               </>
+            )}
+            {!isEdit && (
+              <div className="space-y-2">
+                <Label htmlFor="ownershipMode">Tipo de Propiedad</Label>
+                <Select
+                  value={ownershipMode}
+                  onValueChange={(value) => setOwnershipMode(value as OwnershipMode)}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger id="ownershipMode">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="purchased">Comprado</SelectItem>
+                    <SelectItem value="consignment">Consignación</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  "Comprado" significa que ya pagaste por el stock. "Consignación" significa que el proveedor te lo prestó y deberás devolverlo.
+                </p>
+              </div>
             )}
             <div className="space-y-2">
               <Label htmlFor="totalQuantity">
