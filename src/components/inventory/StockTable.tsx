@@ -276,50 +276,64 @@ export function StockTable(props: StockTableProps) {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Open menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {mode === 'global' &&
-                            isGlobalInventory(item) &&
-                            'onAssign' in props &&
-                            props.onAssign && (
+                      {mode === 'global' && isGlobalInventory(item) ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Open menu</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {'onAssign' in props && props.onAssign && (
                               <DropdownMenuItem onClick={() => props.onAssign!(item)}>
-                              <ArrowRight className="mr-2 h-4 w-4" />
-                              Asignar a barra
-                            </DropdownMenuItem>
-                          )}
-                          {mode === 'bar' && 'onMove' in props && props.onMove && !isGlobalInventory(item) && (
-                            <DropdownMenuItem onClick={() => props.onMove!(item)}>
-                              <ArrowUpDown className="mr-2 h-4 w-4" />
-                              Mover a otra barra
-                            </DropdownMenuItem>
-                          )}
-                          {mode === 'bar' && 'onReturn' in props && props.onReturn && !isGlobalInventory(item) && (
-                            <DropdownMenuItem onClick={() => props.onReturn!(item)}>
-                              <ArrowLeft className="mr-2 h-4 w-4" />
-                              Devolver a global
-                            </DropdownMenuItem>
-                          )}
-                          {mode === 'global' && isGlobalInventory(item) && 'onEdit' in props && props.onEdit && (
-                            <DropdownMenuItem onClick={() => props.onEdit!(item)}>
-                              Editar
-                            </DropdownMenuItem>
-                          )}
-                          {'onDelete' in props && props.onDelete && (
-                            <DropdownMenuItem
-                              onClick={() => (props as any).onDelete(item)}
-                              className="text-destructive"
-                            >
-                              Eliminar
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                                <ArrowRight className="mr-2 h-4 w-4" />
+                                Asignar a barra
+                              </DropdownMenuItem>
+                            )}
+                            {'onEdit' in props && props.onEdit && (
+                              <DropdownMenuItem onClick={() => props.onEdit!(item)}>
+                                Editar
+                              </DropdownMenuItem>
+                            )}
+                            {'onDelete' in props && props.onDelete && (
+                              <DropdownMenuItem
+                                onClick={() => (props as any).onDelete(item)}
+                                className="text-destructive"
+                              >
+                                Eliminar
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : (
+                        !isGlobalInventory(item) && (
+                          <div className="flex gap-2">
+                            {'onMove' in props && props.onMove && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => props.onMove!(item)}
+                              >
+                                <ArrowUpDown className="h-4 w-4" />
+                                <span className="text-xs">Mover a otra barra</span>
+                              </Button>
+                            )}
+                            {'onReturn' in props && props.onReturn && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => props.onReturn!(item)}
+                              >
+                                <ArrowLeft className="h-4 w-4" />
+                                <span className="text-xs">Devolver a global</span>
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      )}
                     </TableCell>
                   </TableRow>
                 );
