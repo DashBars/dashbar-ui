@@ -24,6 +24,7 @@ import { BarFormDialog } from '@/components/bars/BarFormDialog';
 import { useBars } from '@/hooks/useBars';
 import type { Event as ApiEvent, EventStatus, Bar, BarType, BarStatus } from '@/lib/api/types';
 import { ChevronRight, Calendar, MapPin, Trash2, Play } from 'lucide-react';
+import { EventRecipesTab } from '@/components/events/EventRecipesTab';
 
 // Use persisted status from backend (source of truth)
 function getEventStatus(event: ApiEvent): EventStatus {
@@ -232,6 +233,7 @@ export function EventDetailsPage() {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="bars">Bars</TabsTrigger>
+          <TabsTrigger value="recipes">Recetas</TabsTrigger>
           {status === 'finished' && (
             <TabsTrigger value="reports">Reports</TabsTrigger>
           )}
@@ -290,6 +292,10 @@ export function EventDetailsPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="recipes" className="space-y-4">
+          <EventRecipesTab eventId={eventIdNum} isEditable={status === 'upcoming'} />
         </TabsContent>
 
         <TabsContent value="bars" className="space-y-4">

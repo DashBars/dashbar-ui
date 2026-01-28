@@ -41,6 +41,9 @@ import type {
   AssignStockDto,
   MoveStockDto,
   ReturnStockDto,
+  EventRecipe,
+  CreateRecipeDto,
+  UpdateRecipeDto,
 } from './types';
 
 // Configure axios base URL - adjust this to match your backend URL
@@ -263,6 +266,50 @@ export const recipeOverridesApi = {
     await api.delete(
       `/events/${eventId}/bars/${barId}/recipe-overrides/${overrideId}`,
     );
+  },
+};
+
+// Event Recipes API (per event & bar type)
+export const recipesApi = {
+  getRecipes: async (eventId: number, barType?: string): Promise<EventRecipe[]> => {
+    const response = await api.get<EventRecipe[]>(`/events/${eventId}/recipes`, {
+      params: barType ? { barType } : undefined,
+    });
+    return response.data;
+  },
+
+  createRecipe: async (eventId: number, dto: CreateRecipeDto): Promise<EventRecipe> => {
+    const response = await api.post<EventRecipe>(`/events/${eventId}/recipes`, dto);
+    return response.data;
+  },
+
+  updateRecipe: async (
+    eventId: number,
+    recipeId: number,
+    dto: UpdateRecipeDto,
+  ): Promise<EventRecipe> => {
+    const response = await api.put<EventRecipe>(
+      `/events/${eventId}/recipes/${recipeId}`,
+      dto,
+    );
+    return response.data;
+  },
+
+  deleteRecipe: async (eventId: number, recipeId: number): Promise<void> => {
+    await api.delete(`/events/${eventId}/recipes/${recipeId}`);
+  },
+
+  copyRecipes: async (
+    eventId: number,
+    fromBarType: string,
+    toBarType: string,
+  ): Promise<EventRecipe[]> => {
+    const response = await api.post<EventRecipe[]>(
+      `/events/${eventId}/recipes/copy`,
+      null,
+      { params: { from: fromBarType, to: toBarType } },
+    );
+    return response.data;
   },
 };
 

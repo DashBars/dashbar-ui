@@ -144,6 +144,46 @@ export interface Cocktail {
   isCombo: boolean;
 }
 
+// Event-level recipes (per bar type)
+export interface EventRecipe {
+  id: number;
+  eventId: number;
+  cocktailName: string;
+  glassVolume: number;
+  hasIce: boolean;
+  salePrice: number; // precio de venta en centavos
+  barTypes: BarType[];
+  components: Array<{
+    id: number;
+    drinkId: number;
+    percentage: number;
+    drink?: Drink;
+  }>;
+}
+
+export interface RecipeComponentDto {
+  drinkId: number;
+  percentage: number;
+}
+
+export interface CreateRecipeDto {
+  cocktailName: string;
+  glassVolume: number;
+  hasIce: boolean;
+  salePrice: number;
+  barTypes: BarType[];
+  components: RecipeComponentDto[];
+}
+
+export interface UpdateRecipeDto {
+  cocktailName?: string;
+  glassVolume?: number;
+  hasIce?: boolean;
+  salePrice?: number;
+  barTypes?: BarType[];
+  components?: RecipeComponentDto[];
+}
+
 // Posnet types
 export interface Posnet {
   id: number;
