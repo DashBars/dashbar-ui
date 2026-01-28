@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dialog';
 import { Trash2 } from 'lucide-react';
 import { useDeleteBar } from '@/hooks/useBars';
+import { BarMovementsTab } from '@/components/bars/BarMovementsTab';
 
 const barTypeColors: Record<string, 'default' | 'secondary' | 'outline'> = {
   VIP: 'default',
@@ -35,7 +36,7 @@ const statusColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
   lowStock: 'destructive',
 };
 
-type TabKey = 'overview' | 'stock' | 'recipes' | 'pos';
+type TabKey = 'overview' | 'stock' | 'recipes' | 'pos' | 'movements';
 
 export function BarManagementPage() {
   const { eventId, barId } = useParams<{ eventId: string; barId: string }>();
@@ -144,6 +145,7 @@ export function BarManagementPage() {
           <TabsTrigger value="stock">Stock</TabsTrigger>
           <TabsTrigger value="recipes">Recetas</TabsTrigger>
           <TabsTrigger value="pos">POS</TabsTrigger>
+          <TabsTrigger value="movements">Movimientos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -193,6 +195,10 @@ export function BarManagementPage() {
 
         <TabsContent value="pos" className="space-y-4">
           <PosnetsTab posnets={bar?.posnets || []} />
+        </TabsContent>
+
+        <TabsContent value="movements" className="space-y-4">
+          <BarMovementsTab eventId={eventIdNum} barId={barIdNum} />
         </TabsContent>
       </Tabs>
 

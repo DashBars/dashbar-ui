@@ -6,6 +6,8 @@ export const inventoryMovementsKeys = {
   lists: () => [...inventoryMovementsKeys.all, 'list'] as const,
   list: (eventId: number, barId: number) =>
     [...inventoryMovementsKeys.lists(), eventId, barId] as const,
+  byGlobal: (globalInventoryId: number) =>
+    [...inventoryMovementsKeys.lists(), 'global', globalInventoryId] as const,
 };
 
 export function useInventoryMovements(eventId: number, barId: number) {
@@ -13,5 +15,13 @@ export function useInventoryMovements(eventId: number, barId: number) {
     queryKey: inventoryMovementsKeys.list(eventId, barId),
     queryFn: () => inventoryMovementsApi.findAll(eventId, barId),
     enabled: !!eventId && !!barId,
+  });
+}
+
+export function useGlobalInventoryMovements(globalInventoryId: number) {
+  return useQuery({
+    queryKey: inventoryMovementsKeys.byGlobal(globalInventoryId),
+    queryFn: () => inventoryMovementsApi.findByGlobalInventory(globalInventoryId),
+    enabled: !!globalInventoryId,
   });
 }

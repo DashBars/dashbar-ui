@@ -18,6 +18,7 @@ import { DrinksTable } from '@/components/inventory/DrinksTable';
 import { StockTable } from '@/components/inventory/StockTable';
 import { DrinkFormDialog } from '@/components/inventory/DrinkFormDialog';
 import { AddStockDialog } from '@/components/inventory/AddStockDialog';
+import { GlobalInventoryMovementsDialog } from '@/components/inventory/GlobalInventoryMovementsDialog';
 import { AssignStockDialog } from '@/components/inventory/AssignStockDialog';
 import { useDrinks, useDeleteDrink } from '@/hooks/useDrinks';
 import type { Supplier, GlobalInventory, Drink } from '@/lib/api/types';
@@ -112,10 +113,17 @@ export function SuppliersAndInventoryPage() {
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [inventoryToAssign, setInventoryToAssign] = useState<GlobalInventory | null>(null);
+  const [movementsDialogOpen, setMovementsDialogOpen] = useState(false);
+  const [inventoryForMovements, setInventoryForMovements] = useState<GlobalInventory | null>(null);
 
   const handleAssignToBar = (item: GlobalInventory) => {
     setInventoryToAssign(item);
     setAssignDialogOpen(true);
+  };
+
+  const handleViewMovements = (item: GlobalInventory) => {
+    setInventoryForMovements(item);
+    setMovementsDialogOpen(true);
   };
 
   const handleDeleteInventoryClick = (item: GlobalInventory) => {
@@ -268,6 +276,7 @@ export function SuppliersAndInventoryPage() {
               onAssign={handleAssignToBar}
               onEdit={handleEditInventory}
               onDelete={handleDeleteInventoryClick}
+              onViewMovements={handleViewMovements}
             />
           )}
         </TabsContent>
@@ -344,6 +353,15 @@ export function SuppliersAndInventoryPage() {
         inventory={editingInventory}
         open={addStockDialogOpen}
         onOpenChange={setAddStockDialogOpen}
+      />
+
+      <GlobalInventoryMovementsDialog
+        inventory={inventoryForMovements}
+        open={movementsDialogOpen}
+        onOpenChange={(open) => {
+          setMovementsDialogOpen(open);
+          if (!open) setInventoryForMovements(null);
+        }}
       />
 
       <Dialog

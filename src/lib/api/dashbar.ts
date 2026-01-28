@@ -448,6 +448,14 @@ export const inventoryMovementsApi = {
     );
     return response.data;
   },
+  findByGlobalInventory: async (
+    globalInventoryId: number,
+  ): Promise<InventoryMovement[]> => {
+    const response = await api.get<InventoryMovement[]>(
+      `/global-inventory/${globalInventoryId}/movements`,
+    );
+    return response.data;
+  },
 };
 
 // Events API

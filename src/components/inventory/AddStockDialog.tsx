@@ -262,7 +262,7 @@ export function AddStockDialog({
               Ingresa el costo unitario en unidades (ej: 50.00 para $50.00)
             </p>
             <div className="space-y-2">
-              <Label htmlFor="sku">SKU del Proveedor</Label>
+              <Label htmlFor="sku">SKU del Insumo</Label>
               <Input
                 id="sku"
                 value={sku}
@@ -271,7 +271,7 @@ export function AddStockDialog({
                 placeholder="SKU-12345"
               />
               <p className="text-xs text-muted-foreground">
-                Opcional. SKU específico del proveedor (puede diferir del SKU del insumo).
+                Opcional. SKU del insumo en tu inventario.
               </p>
             </div>
           </div>

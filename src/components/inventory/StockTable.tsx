@@ -34,6 +34,7 @@ type GlobalStockTableProps = {
   onAssign?: (item: GlobalInventory) => void;
   onEdit?: (item: GlobalInventory) => void;
   onDelete?: (item: GlobalInventory) => void;
+  onViewMovements?: (item: GlobalInventory) => void;
 };
 
 type BarStockTableProps = {
@@ -291,6 +292,14 @@ export function StockTable(props: StockTableProps) {
                                 Asignar a barra
                               </DropdownMenuItem>
                             )}
+                            {'onViewMovements' in props &&
+                              props.onViewMovements && (
+                                <DropdownMenuItem
+                                  onClick={() => props.onViewMovements!(item)}
+                                >
+                                  Ver movimientos
+                                </DropdownMenuItem>
+                              )}
                             {'onEdit' in props && props.onEdit && (
                               <DropdownMenuItem onClick={() => props.onEdit!(item)}>
                                 Editar
