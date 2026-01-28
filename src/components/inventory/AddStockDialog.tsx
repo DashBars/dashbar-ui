@@ -52,7 +52,7 @@ export function AddStockDialog({
   const { data: suppliers = [], isLoading: isLoadingSuppliers } = useSuppliers();
 
   const [drinkId, setDrinkId] = useState<string>('');
-  const [supplierId, setSupplierId] = useState<string>('');
+  const [supplierId, setSupplierId] = useState<string>('none');
   const [totalQuantity, setTotalQuantity] = useState<string>('');
   const [unitCost, setUnitCost] = useState<string>('');
   const [currency, setCurrency] = useState<string>('ARS');
@@ -63,7 +63,7 @@ export function AddStockDialog({
     if (open) {
       if (isEdit && inventory) {
         setDrinkId(inventory.drinkId.toString());
-        setSupplierId(inventory.supplierId?.toString() || '');
+        setSupplierId(inventory.supplierId ? inventory.supplierId.toString() : 'none');
         setTotalQuantity(inventory.totalQuantity.toString());
         setUnitCost((inventory.unitCost / 100).toFixed(2)); // Convertir de centavos a unidades
         setCurrency(inventory.currency || 'ARS');
@@ -71,7 +71,7 @@ export function AddStockDialog({
         setOwnershipMode(inventory.ownershipMode);
       } else {
         setDrinkId('');
-        setSupplierId('');
+        setSupplierId('none');
         setTotalQuantity('');
         setUnitCost('');
         setCurrency('ARS');
@@ -98,7 +98,7 @@ export function AddStockDialog({
     } else {
       const dto: CreateGlobalInventoryDto = {
         drinkId: parseInt(drinkId, 10),
-        supplierId: supplierId ? parseInt(supplierId, 10) : undefined,
+        supplierId: supplierId !== 'none' ? parseInt(supplierId, 10) : undefined,
         totalQuantity: parseInt(totalQuantity, 10),
         unitCost: Math.round(parseFloat(unitCost) * 100), // Convertir a centavos para almacenar
         currency: currency,
@@ -168,7 +168,7 @@ export function AddStockDialog({
                       <SelectValue placeholder="Seleccionar proveedor (opcional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sin proveedor</SelectItem>
+                      <SelectItem value="none">Sin proveedor</SelectItem>
                       {suppliers.map((supplier) => (
                         <SelectItem key={supplier.id} value={supplier.id.toString()}>
                           {supplier.name}

@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { globalInventoryApi } from '@/lib/api/dashbar';
 import type {
-  GlobalInventory,
   CreateGlobalInventoryDto,
   UpdateGlobalInventoryDto,
 } from '@/lib/api/types';

@@ -2,7 +2,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils/cn';
 import { 
   Calendar, 
-  LayoutGrid, 
   BarChart3,
   MapPin,
   Truck

@@ -1,11 +1,10 @@
 import { useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { BarsPageHeader } from '@/components/bars/BarsPageHeader';
 import { BarsSummaryCards } from '@/components/bars/BarsSummaryCards';
 import { BarsFilters } from '@/components/bars/BarsFilters';
 import { BarsTable } from '@/components/bars/BarsTable';
 import { BarFormDialog } from '@/components/bars/BarFormDialog';
-import { BarDetailsSheet } from '@/components/bars/BarDetailsSheet';
 import { useBars } from '@/hooks/useBars';
 import { useEvent } from '@/hooks/useEvents';
 import type { Bar, BarType, BarStatus } from '@/lib/api/types';
@@ -13,6 +12,7 @@ import type { Bar, BarType, BarStatus } from '@/lib/api/types';
 export function EventsBarsPage() {
   const { eventId } = useParams<{ eventId: string }>();
   const eventIdNum = parseInt(eventId || '0', 10);
+  const navigate = useNavigate();
   const { data: bars, isLoading, error } = useBars(eventIdNum);
   const { data: event } = useEvent(eventIdNum);
   
@@ -23,9 +23,6 @@ export function EventsBarsPage() {
   const [statusFilter, setStatusFilter] = useState<BarStatus | 'all'>('all');
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingBar, setEditingBar] = useState<Bar | null>(null);
-  const [selectedBar, setSelectedBar] = useState<Bar | null>(null);
-  const [detailsSheetOpen, setDetailsSheetOpen] = useState(false);
-  const [initialTab, setInitialTab] = useState<'overview' | 'stock' | 'recipes' | 'pos'>('overview');
 
   const filteredBars = useMemo(() => {
     if (!bars) return [];
@@ -44,26 +41,8 @@ export function EventsBarsPage() {
     setFormDialogOpen(true);
   };
 
-  const handleEdit = (bar: Bar) => {
-    setEditingBar(bar);
-    setFormDialogOpen(true);
-  };
-
   const handleViewDetails = (bar: Bar) => {
-    setSelectedBar(bar);
-    setDetailsSheetOpen(true);
-  };
-
-  const handleManageStock = (bar: Bar) => {
-    setSelectedBar(bar);
-    setInitialTab('stock');
-    setDetailsSheetOpen(true);
-  };
-
-  const handleManageRecipes = (bar: Bar) => {
-    setSelectedBar(bar);
-    setInitialTab('recipes');
-    setDetailsSheetOpen(true);
+    navigate(`/events/${eventIdNum}/bars/${bar.id}`);
   };
 
   // Show error message if there's an error
@@ -115,9 +94,6 @@ export function EventsBarsPage() {
         bars={filteredBars}
         isLoading={isLoading}
         onViewDetails={handleViewDetails}
-        onEdit={handleEdit}
-        onManageStock={handleManageStock}
-        onManageRecipes={handleManageRecipes}
       />
       <BarFormDialog
         eventId={eventIdNum}
@@ -125,15 +101,6 @@ export function EventsBarsPage() {
         open={formDialogOpen}
         onOpenChange={setFormDialogOpen}
       />
-      {selectedBar && (
-        <BarDetailsSheet
-          eventId={eventIdNum}
-          bar={selectedBar}
-          open={detailsSheetOpen}
-          onOpenChange={setDetailsSheetOpen}
-          initialTab={initialTab}
-        />
-      )}
     </div>
   );
 }

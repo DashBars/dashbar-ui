@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useEvent, useActivateEvent, useFinishEvent, useDeleteEvent, useArchiveEvent } from '@/hooks/useEvents';
+import { useEvent, useDeleteEvent, useArchiveEvent } from '@/hooks/useEvents';
 import { ActivateEventDialog } from '@/components/events/ActivateEventDialog';
 import { FinishEventButton } from '@/components/events/FinishEventButton';
 import { BarsPageHeader } from '@/components/bars/BarsPageHeader';
@@ -21,13 +21,12 @@ import { BarsSummaryCards } from '@/components/bars/BarsSummaryCards';
 import { BarsFilters } from '@/components/bars/BarsFilters';
 import { BarsTable } from '@/components/bars/BarsTable';
 import { BarFormDialog } from '@/components/bars/BarFormDialog';
-import { BarDetailsSheet } from '@/components/bars/BarDetailsSheet';
 import { useBars } from '@/hooks/useBars';
-import type { EventStatus, Bar, BarType, BarStatus } from '@/lib/api/types';
+import type { Event as ApiEvent, EventStatus, Bar, BarType, BarStatus } from '@/lib/api/types';
 import { ChevronRight, Calendar, MapPin, Trash2, Play } from 'lucide-react';
 
 // Use persisted status from backend (source of truth)
-function getEventStatus(event: Event): EventStatus {
+function getEventStatus(event: ApiEvent): EventStatus {
   return event.status || 'upcoming'; // Fallback to upcoming if status is missing
 }
 
@@ -81,9 +80,6 @@ export function EventDetailsPage() {
   const [statusFilter, setStatusFilter] = useState<BarStatus | 'all'>('all');
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingBar, setEditingBar] = useState<Bar | null>(null);
-  const [selectedBar, setSelectedBar] = useState<Bar | null>(null);
-  const [detailsSheetOpen, setDetailsSheetOpen] = useState(false);
-  const [initialTab, setInitialTab] = useState<'overview' | 'stock' | 'recipes' | 'pos'>('overview');
 
   const filteredBars = useMemo(() => {
     if (!bars) return [];
@@ -119,20 +115,8 @@ export function EventDetailsPage() {
     setFormDialogOpen(true);
   };
 
-  const handleEdit = (bar: Bar) => {
-    setEditingBar(bar);
-    setFormDialogOpen(true);
-  };
-
-  const handleViewDetails = (bar: Bar, tab?: 'overview' | 'stock' | 'recipes' | 'pos') => {
-    setSelectedBar(bar);
-    if (tab) setInitialTab(tab);
-    setDetailsSheetOpen(true);
-  };
-
-  // Make bar rows clickable to manage
   const handleBarClick = (bar: Bar) => {
-    handleViewDetails(bar);
+    navigate(`/events/${eventIdNum}/bars/${bar.id}`);
   };
 
   if (isLoading) {
@@ -328,9 +312,6 @@ export function EventDetailsPage() {
                 bars={filteredBars}
                 isLoading={isLoadingBars}
                 onViewDetails={handleBarClick}
-                onEdit={handleEdit}
-                onManageStock={handleBarClick}
-                onManageRecipes={handleBarClick}
               />
         </TabsContent>
 
@@ -357,15 +338,6 @@ export function EventDetailsPage() {
         open={formDialogOpen}
         onOpenChange={setFormDialogOpen}
       />
-      {selectedBar && (
-        <BarDetailsSheet
-          eventId={eventIdNum}
-          bar={selectedBar}
-          open={detailsSheetOpen}
-          onOpenChange={setDetailsSheetOpen}
-          initialTab={initialTab}
-        />
-      )}
 
       {event && status === 'upcoming' && (
         <ActivateEventDialog

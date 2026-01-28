@@ -15,7 +15,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { LogOut, User, Menu } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils/cn';
-import { Calendar, LayoutGrid, BarChart3, Truck, MapPin } from 'lucide-react';
+import { Calendar, BarChart3, Truck, MapPin } from 'lucide-react';
 
 interface NavItem {
   title: string;

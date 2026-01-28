@@ -7,14 +7,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Eye, Edit, Package, ChefHat } from 'lucide-react';
 import type { Bar } from '@/lib/api/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,9 +16,6 @@ interface BarsTableProps {
   bars: Bar[] | undefined;
   isLoading: boolean;
   onViewDetails: (bar: Bar) => void;
-  onEdit: (bar: Bar) => void;
-  onManageStock: (bar: Bar) => void;
-  onManageRecipes: (bar: Bar) => void;
 }
 
 const barTypeColors: Record<string, 'default' | 'secondary' | 'outline'> = {
@@ -41,14 +31,8 @@ const statusColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
   lowStock: 'destructive',
 };
 
-export function BarsTable({
-  bars,
-  isLoading,
-  onViewDetails,
-  onEdit,
-  onManageStock,
-  onManageRecipes,
-}: BarsTableProps) {
+export function BarsTable(props: BarsTableProps) {
+  const { bars, isLoading, onViewDetails } = props;
   if (isLoading) {
     return (
       <Card>

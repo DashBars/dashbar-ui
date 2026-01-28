@@ -25,47 +25,53 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MoreHorizontal, ArrowRight, ArrowLeft, ArrowUpDown } from 'lucide-react';
-import type { GlobalInventory, Stock, OwnershipMode } from '@/lib/api/types';
+import type { GlobalInventory, Stock } from '@/lib/api/types';
 
-type StockTableItem = GlobalInventory | Stock;
-
-interface StockTableProps {
-  items: StockTableItem[];
+type GlobalStockTableProps = {
+  mode: 'global';
+  items: GlobalInventory[];
   isLoading?: boolean;
-  mode: 'global' | 'bar'; // Determina qué acciones mostrar
-  onAssign?: (item: GlobalInventory) => void; // Solo para global
-  onMove?: (item: Stock) => void; // Solo para bar
-  onReturn?: (item: Stock) => void; // Solo para bar
-  onEdit?: (item: StockTableItem) => void;
-  onDelete?: (item: StockTableItem) => void;
-  suppliers?: Array<{ id: number; name: string }>; // Para filtros
+  onAssign?: (item: GlobalInventory) => void;
+  onEdit?: (item: GlobalInventory) => void;
+  onDelete?: (item: GlobalInventory) => void;
+};
+
+type BarStockTableProps = {
+  mode: 'bar';
+  items: Stock[];
+  isLoading?: boolean;
+  onMove?: (item: Stock) => void;
+  onReturn?: (item: Stock) => void;
+  onDelete?: (item: Stock) => void;
+};
+
+type StockTableProps = GlobalStockTableProps | BarStockTableProps;
+
+function isGlobalInventory(item: GlobalInventory | Stock): item is GlobalInventory {
+  return (item as GlobalInventory).totalQuantity !== undefined;
 }
 
-function isGlobalInventory(item: StockTableItem): item is GlobalInventory {
-  return 'totalQuantity' in item && 'allocatedQuantity' in item;
-}
-
-function isStock(item: StockTableItem): item is Stock {
-  return 'quantity' in item && 'barId' in item;
-}
-
-export function StockTable({
-  items,
-  isLoading,
-  mode,
-  onAssign,
-  onMove,
-  onReturn,
-  onEdit,
-  onDelete,
-  suppliers = [],
-}: StockTableProps) {
+export function StockTable(props: StockTableProps) {
+  const mode = props.mode;
+  const isLoading = props.isLoading;
   const [search, setSearch] = useState('');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
   const [ownershipFilter, setOwnershipFilter] = useState<string>('all');
 
+  // Get unique suppliers from items (hook must be unconditional)
+  const uniqueSuppliers = useMemo(() => {
+    const supplierMap = new Map<number, { id: number; name: string }>();
+    props.items.forEach((item) => {
+      const supplier = isGlobalInventory(item) ? item.supplier : item.supplier;
+      if (supplier && !supplierMap.has(supplier.id)) {
+        supplierMap.set(supplier.id, supplier);
+      }
+    });
+    return Array.from(supplierMap.values());
+  }, [props.items]);
+
   const filteredItems = useMemo(() => {
-    let filtered = items;
+    let filtered: Array<GlobalInventory | Stock> = props.items;
 
     // Search filter
     if (search) {
@@ -99,7 +105,7 @@ export function StockTable({
     }
 
     return filtered;
-  }, [items, search, supplierFilter, ownershipFilter]);
+  }, [props.items, search, supplierFilter, ownershipFilter]);
 
   const formatCurrency = (amount: number, currency: string = 'ARS') => {
     return `${currency} ${(amount / 100).toLocaleString('en-US', {
@@ -146,18 +152,6 @@ export function StockTable({
       </div>
     );
   }
-
-  // Get unique suppliers from items
-  const uniqueSuppliers = useMemo(() => {
-    const supplierMap = new Map<number, { id: number; name: string }>();
-    items.forEach((item) => {
-      const supplier = isGlobalInventory(item) ? item.supplier : item.supplier;
-      if (supplier && !supplierMap.has(supplier.id)) {
-        supplierMap.set(supplier.id, supplier);
-      }
-    });
-    return Array.from(supplierMap.values());
-  }, [items]);
 
   return (
     <div className="space-y-4">
@@ -221,22 +215,16 @@ export function StockTable({
               </TableRow>
             ) : (
               filteredItems.map((item) => {
-                const drink = isGlobalInventory(item) ? item.drink : item.drink;
-                const supplier = isGlobalInventory(item)
-                  ? item.supplier
-                  : item.supplier;
-                const quantity = isGlobalInventory(item)
-                  ? item.totalQuantity
-                  : item.quantity;
+                const drink = item.drink;
+                const supplier = isGlobalInventory(item) ? item.supplier : item.supplier;
+                const quantity = isGlobalInventory(item) ? item.totalQuantity : item.quantity;
                 const availableQuantity = isGlobalInventory(item)
                   ? item.totalQuantity - item.allocatedQuantity
                   : undefined;
 
                 const itemKey = isGlobalInventory(item)
                   ? item.id
-                  : isStock(item)
-                    ? `${item.barId}-${item.drinkId}-${item.supplierId}`
-                    : `${item.drinkId}-${item.supplierId}`;
+                  : `${item.barId}-${item.drinkId}-${item.supplierId}`;
 
                 return (
                   <TableRow key={itemKey}>
@@ -244,7 +232,12 @@ export function StockTable({
                       {drink?.name || `Drink ${item.drinkId}`}
                     </TableCell>
                     <TableCell>
-                      {supplier?.name || (item.supplierId ? `Supplier ${item.supplierId}` : 'Sin proveedor')}
+                      {supplier?.name ||
+                        (isGlobalInventory(item)
+                          ? item.supplierId
+                            ? `Supplier ${item.supplierId}`
+                            : 'Sin proveedor'
+                          : `Supplier ${item.supplierId}`)}
                     </TableCell>
                     <TableCell>{quantity}</TableCell>
                     {mode === 'global' && (
@@ -260,9 +253,7 @@ export function StockTable({
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {isGlobalInventory(item)
-                              ? item.allocatedQuantity
-                              : 0}
+                            {isGlobalInventory(item) ? item.allocatedQuantity : 0}
                           </Badge>
                         </TableCell>
                       </>
@@ -293,32 +284,35 @@ export function StockTable({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {mode === 'global' && isGlobalInventory(item) && onAssign && (
-                            <DropdownMenuItem onClick={() => onAssign(item)}>
+                          {mode === 'global' &&
+                            isGlobalInventory(item) &&
+                            'onAssign' in props &&
+                            props.onAssign && (
+                              <DropdownMenuItem onClick={() => props.onAssign!(item)}>
                               <ArrowRight className="mr-2 h-4 w-4" />
                               Asignar a barra
                             </DropdownMenuItem>
                           )}
-                          {mode === 'bar' && isStock(item) && onMove && (
-                            <DropdownMenuItem onClick={() => onMove(item)}>
+                          {mode === 'bar' && 'onMove' in props && props.onMove && !isGlobalInventory(item) && (
+                            <DropdownMenuItem onClick={() => props.onMove!(item)}>
                               <ArrowUpDown className="mr-2 h-4 w-4" />
                               Mover a otra barra
                             </DropdownMenuItem>
                           )}
-                          {mode === 'bar' && isStock(item) && onReturn && (
-                            <DropdownMenuItem onClick={() => onReturn(item)}>
+                          {mode === 'bar' && 'onReturn' in props && props.onReturn && !isGlobalInventory(item) && (
+                            <DropdownMenuItem onClick={() => props.onReturn!(item)}>
                               <ArrowLeft className="mr-2 h-4 w-4" />
                               Devolver a global
                             </DropdownMenuItem>
                           )}
-                          {onEdit && (
-                            <DropdownMenuItem onClick={() => onEdit(item)}>
+                          {mode === 'global' && isGlobalInventory(item) && 'onEdit' in props && props.onEdit && (
+                            <DropdownMenuItem onClick={() => props.onEdit!(item)}>
                               Editar
                             </DropdownMenuItem>
                           )}
-                          {onDelete && (
+                          {'onDelete' in props && props.onDelete && (
                             <DropdownMenuItem
-                              onClick={() => onDelete(item)}
+                              onClick={() => (props as any).onDelete(item)}
                               className="text-destructive"
                             >
                               Eliminar

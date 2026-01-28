@@ -19,7 +19,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, Pencil, Trash2, ArrowRight, Eye } from 'lucide-react';
 import type { ManagerInventory } from '@/lib/api/types';
-import { cn } from '@/lib/utils/cn';
 
 interface InventoryTableProps {
   inventory: ManagerInventory[];

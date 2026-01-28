@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -19,16 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useEvents } from '@/hooks/useEvents';
+import { useEvents, useUnarchiveEvent } from '@/hooks/useEvents';
 import { EventFormDialog } from '@/components/events/EventFormDialog';
 import type { Event, EventStatus } from '@/lib/api/types';
 import { Plus } from 'lucide-react';
@@ -71,6 +64,7 @@ function StatusBadge({ status }: { status: EventStatus }) {
 export function EventsListPage() {
   const navigate = useNavigate();
   const { data: events = [], isLoading } = useEvents();
+  const { mutate: unarchiveEvent, isPending: isUnarchiving } = useUnarchiveEvent();
 
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -78,34 +72,30 @@ export function EventsListPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const filteredEvents = useMemo(() => {
-    let filtered = events;
+  const searchedEvents = useMemo(() => {
+    if (!search) return events;
+    const lowerSearch = search.toLowerCase();
+    return events.filter(
+      (e) =>
+        e.name.toLowerCase().includes(lowerSearch) ||
+        e.description?.toLowerCase().includes(lowerSearch),
+    );
+  }, [events, search]);
 
-    // Search filter
-    if (search) {
-      const lowerSearch = search.toLowerCase();
-      filtered = filtered.filter(
-        (e) =>
-          e.name.toLowerCase().includes(lowerSearch) ||
-          e.description?.toLowerCase().includes(lowerSearch),
-      );
-    }
-
-    // Status filter
+  const activeEvents = useMemo(() => {
+    let filtered = searchedEvents.filter((e) => getEventStatus(e) !== 'archived');
     if (statusFilter !== 'all') {
       filtered = filtered.filter((e) => getEventStatus(e) === statusFilter);
     }
-
     return filtered;
-  }, [events, search, statusFilter]);
+  }, [searchedEvents, statusFilter]);
+
+  const archivedEvents = useMemo(() => {
+    return searchedEvents.filter((e) => getEventStatus(e) === 'archived');
+  }, [searchedEvents]);
 
   const handleCreate = () => {
     setEditingEvent(null);
-    setFormDialogOpen(true);
-  };
-
-  const handleEdit = (event: Event) => {
-    setEditingEvent(event);
     setFormDialogOpen(true);
   };
 
@@ -121,7 +111,6 @@ export function EventsListPage() {
             <Skeleton className="h-9 w-32 mb-2" />
             <Skeleton className="h-4 w-64" />
           </div>
-          <Skeleton className="h-10 w-32" />
         </div>
         <div className="space-y-4">
           <div className="flex gap-4">
@@ -178,10 +167,12 @@ export function EventsListPage() {
             Manage your events and their lifecycle
           </p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create event
-        </Button>
+        {events.length > 0 && (
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create event
+          </Button>
+        )}
       </div>
 
       {events.length === 0 && !isLoading ? (
@@ -201,82 +192,166 @@ export function EventsListPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          <div className="flex gap-4">
-            <Input
-              placeholder="Search events..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="max-w-sm"
-            />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="upcoming">Upcoming</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="finished">Finished</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <Tabs defaultValue="active" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="active">Eventos</TabsTrigger>
+            <TabsTrigger value="archived">
+              Archivados {archivedEvents.length > 0 ? `(${archivedEvents.length})` : ''}
+            </TabsTrigger>
+          </TabsList>
 
-          <Card className="rounded-2xl border shadow-sm">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Venue</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Start</TableHead>
-                    <TableHead>End</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredEvents.length === 0 ? (
+          <TabsContent value="active" className="space-y-4">
+            <div className="flex gap-4">
+              <Input
+                placeholder="Search events..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="max-w-sm"
+              />
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="upcoming">Upcoming</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="finished">Finished</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Card className="rounded-2xl border shadow-sm">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                        No events found
-                      </TableCell>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Venue</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Start</TableHead>
+                      <TableHead>End</TableHead>
                     </TableRow>
-                  ) : (
-                    filteredEvents.map((event) => {
-                      const status = getEventStatus(event);
-                      return (
-                        <TableRow 
-                          key={event.id}
-                          className="cursor-pointer hover:bg-muted/50 transition-colors"
-                          onClick={() => handleRowClick(event)}
+                  </TableHeader>
+                  <TableBody>
+                    {activeEvents.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={5}
+                          className="h-24 text-center text-muted-foreground"
                         >
-                          <TableCell className="font-medium">{event.name}</TableCell>
-                          <TableCell>
-                            {event.venue?.name || '-'}
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={status} />
-                          </TableCell>
-                          <TableCell>
-                            {status === 'upcoming' && event.startedAt ? (
-                              <div className="flex flex-col">
-                                <span className="text-muted-foreground text-xs">Scheduled:</span>
-                                <span>{formatDate(event.startedAt)}</span>
-                              </div>
-                            ) : (
-                              formatDate(event.startedAt)
-                            )}
-                          </TableCell>
-                          <TableCell>{formatDate(event.finishedAt)}</TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
+                          No events found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      activeEvents.map((event) => {
+                        const status = getEventStatus(event);
+                        return (
+                          <TableRow
+                            key={event.id}
+                            className="cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => handleRowClick(event)}
+                          >
+                            <TableCell className="font-medium">{event.name}</TableCell>
+                            <TableCell>{event.venue?.name || '-'}</TableCell>
+                            <TableCell>
+                              <StatusBadge status={status} />
+                            </TableCell>
+                            <TableCell>
+                              {status === 'upcoming' && event.startedAt ? (
+                                <div className="flex flex-col">
+                                  <span className="text-muted-foreground text-xs">
+                                    Scheduled:
+                                  </span>
+                                  <span>{formatDate(event.startedAt)}</span>
+                                </div>
+                              ) : (
+                                formatDate(event.startedAt)
+                              )}
+                            </TableCell>
+                            <TableCell>{formatDate(event.finishedAt)}</TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="archived" className="space-y-4">
+            <div className="flex gap-4">
+              <Input
+                placeholder="Search archived events..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
+
+            <Card className="rounded-2xl border shadow-sm">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Venue</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Start</TableHead>
+                      <TableHead>End</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {archivedEvents.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={6}
+                          className="h-24 text-center text-muted-foreground"
+                        >
+                          No archived events
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      archivedEvents.map((event) => {
+                        const status = getEventStatus(event);
+                        return (
+                          <TableRow
+                            key={event.id}
+                            className="cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => handleRowClick(event)}
+                          >
+                            <TableCell className="font-medium">{event.name}</TableCell>
+                            <TableCell>{event.venue?.name || '-'}</TableCell>
+                            <TableCell>
+                              <StatusBadge status={status} />
+                            </TableCell>
+                            <TableCell>{formatDate(event.startedAt)}</TableCell>
+                            <TableCell>{formatDate(event.finishedAt)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isUnarchiving}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  unarchiveEvent(event.id);
+                                }}
+                              >
+                                Desarchivar
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       )}
 
       <EventFormDialog

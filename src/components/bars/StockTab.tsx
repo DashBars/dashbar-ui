@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus } from 'lucide-react';
-import { useStock, useDeleteStock } from '@/hooks/useStock';
-import { StockAdjustDialog } from './StockAdjustDialog';
+import { useStock } from '@/hooks/useStock';
 import { StockTable } from '@/components/inventory/StockTable';
 import { MoveStockDialog } from '@/components/inventory/MoveStockDialog';
 import { ReturnStockDialog } from '@/components/inventory/ReturnStockDialog';
 import type { Stock } from '@/lib/api/types';
+import { AssignBarStockDialog } from '@/components/bars/AssignBarStockDialog';
 
 interface StockTabProps {
   eventId: number;
@@ -16,25 +15,11 @@ interface StockTabProps {
 
 export function StockTab({ eventId, barId }: StockTabProps) {
   const { data: stock = [], isLoading } = useStock(eventId, barId);
-  const deleteStock = useDeleteStock(eventId, barId);
-  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [stockToMove, setStockToMove] = useState<Stock | null>(null);
   const [stockToReturn, setStockToReturn] = useState<Stock | null>(null);
-
-  const handleDelete = (item: Stock) => {
-    if (
-      confirm(
-        `¿Estás seguro de que quieres eliminar el stock de ${item.drink?.name} del proveedor ${item.supplier?.name}?`
-      )
-    ) {
-      deleteStock.mutate({
-        drinkId: item.drinkId,
-        supplierId: item.supplierId,
-      });
-    }
-  };
 
   const handleMove = (item: Stock) => {
     setStockToMove(item);
@@ -52,12 +37,12 @@ export function StockTab({ eventId, barId }: StockTabProps) {
         <div>
           <h3 className="text-lg font-semibold">Stock de la Barra</h3>
           <p className="text-sm text-muted-foreground">
-            Gestiona el stock asignado a esta barra
+            Solo podés asignar stock desde el inventario global y devolverlo cuando corresponda
           </p>
         </div>
-        <Button onClick={() => setAdjustDialogOpen(true)} className="gap-2">
+        <Button onClick={() => setAssignDialogOpen(true)} className="gap-2">
           <Plus className="h-4 w-4" />
-          Ajustar Stock
+          Asignar desde Inventario Global
         </Button>
       </div>
 
@@ -67,14 +52,13 @@ export function StockTab({ eventId, barId }: StockTabProps) {
         mode="bar"
         onMove={handleMove}
         onReturn={handleReturn}
-        onDelete={handleDelete}
       />
 
-      <StockAdjustDialog
+      <AssignBarStockDialog
         eventId={eventId}
         barId={barId}
-        open={adjustDialogOpen}
-        onOpenChange={setAdjustDialogOpen}
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
       />
 
       {stockToMove && (

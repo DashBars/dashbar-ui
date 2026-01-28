@@ -4,6 +4,8 @@ import { Sidebar } from './Sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
+import { RuntimeErrorOverlay } from '@/components/RuntimeErrorOverlay';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export function AppShell() {
   const { isLoading } = useAuth();
@@ -38,6 +40,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <RuntimeErrorOverlay />
       <Topbar />
       <div className="flex flex-1">
         {/* Desktop Sidebar */}
@@ -46,7 +49,9 @@ export function AppShell() {
         </aside>
         {/* Main Content */}
         <main className="flex-1 md:ml-64">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

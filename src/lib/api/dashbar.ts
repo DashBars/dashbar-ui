@@ -348,13 +348,25 @@ export const managerInventoryApi = {
 
 // Drinks API
 export const globalInventoryApi = {
-  getAll: () => api.get<GlobalInventory[]>('/global-inventory'),
-  getOne: (id: number) => api.get<GlobalInventory>(`/global-inventory/${id}`),
-  create: (dto: CreateGlobalInventoryDto) =>
-    api.post<GlobalInventory>('/global-inventory', dto),
-  update: (id: number, dto: UpdateGlobalInventoryDto) =>
-    api.patch<GlobalInventory>(`/global-inventory/${id}`, dto),
-  delete: (id: number) => api.delete(`/global-inventory/${id}`),
+  getAll: async (): Promise<GlobalInventory[]> => {
+    const response = await api.get<GlobalInventory[]>('/global-inventory');
+    return response.data;
+  },
+  getOne: async (id: number): Promise<GlobalInventory> => {
+    const response = await api.get<GlobalInventory>(`/global-inventory/${id}`);
+    return response.data;
+  },
+  create: async (dto: CreateGlobalInventoryDto): Promise<GlobalInventory> => {
+    const response = await api.post<GlobalInventory>('/global-inventory', dto);
+    return response.data;
+  },
+  update: async (id: number, dto: UpdateGlobalInventoryDto): Promise<GlobalInventory> => {
+    const response = await api.patch<GlobalInventory>(`/global-inventory/${id}`, dto);
+    return response.data;
+  },
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/global-inventory/${id}`);
+  },
 };
 
 export const drinksApi = {
@@ -481,6 +493,11 @@ export const eventsApi = {
 
   archiveEvent: async (id: number): Promise<Event> => {
     const response = await api.post<Event>(`/events/${id}/archive`);
+    return response.data;
+  },
+
+  unarchiveEvent: async (id: number): Promise<Event> => {
+    const response = await api.post<Event>(`/events/${id}/unarchive`);
     return response.data;
   },
 };

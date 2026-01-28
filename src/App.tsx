@@ -9,6 +9,9 @@ import { EventsBarsPage } from './pages/EventsBarsPage';
 import { SuppliersAndInventoryPage } from './pages/SuppliersAndInventoryPage';
 import { VenuesPage } from './pages/VenuesPage';
 import { BarInventoryPage } from './pages/BarInventoryPage';
+import { BarManagementPage } from './pages/BarManagementPage';
+import { BarTabRedirect } from './pages/BarTabRedirect';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { AppShell } from './components/layout/AppShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import './App.css';
@@ -49,8 +52,15 @@ function App() {
               <Route path="/venues" element={<VenuesPage />} />
               <Route path="/events" element={<EventsListPage />} />
               <Route path="/events/:eventId" element={<EventDetailsPage />} />
+              <Route path="/events/:eventId/bars/:barId" element={<BarManagementPage />} />
+              {/* Legacy deep-links -> redirect to new bar management tabs */}
+              <Route path="/events/:eventId/bars/:barId/stock" element={<BarTabRedirect tab="stock" />} />
+              <Route path="/events/:eventId/bars/:barId/recipes" element={<BarTabRedirect tab="recipes" />} />
+              <Route path="/events/:eventId/bars/:barId/pos" element={<BarTabRedirect tab="pos" />} />
+              <Route path="/events/:eventId/bars/:barId/overview" element={<BarTabRedirect tab="overview" />} />
               <Route path="/events/:eventId/bars/:barId/inventory" element={<BarInventoryPage />} />
               <Route path="/events/:eventId/bars" element={<EventsBarsPage />} />
+              <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Routes>
           <Toaster position="top-right" />

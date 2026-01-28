@@ -136,3 +136,22 @@ export function useArchiveEvent() {
     },
   });
 }
+
+export function useUnarchiveEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => eventsApi.unarchiveEvent(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: eventsKeys.list() });
+      queryClient.invalidateQueries({ queryKey: eventsKeys.detail(id) });
+      toast.success('Event unarchived successfully');
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        'Error unarchiving event';
+      toast.error(errorMessage);
+    },
+  });
+}

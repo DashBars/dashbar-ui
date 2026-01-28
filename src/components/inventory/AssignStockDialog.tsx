@@ -20,7 +20,6 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useEvents } from '@/hooks/useEvents';
 import { useBars } from '@/hooks/useBars';
-import { useGlobalInventory } from '@/hooks/useGlobalInventory';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { stockMovementsApi } from '@/lib/api/dashbar';
 import type { GlobalInventory, AssignStockDto } from '@/lib/api/types';
