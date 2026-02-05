@@ -18,13 +18,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { useEvents } from '@/hooks/useEvents';
 import { useBars } from '@/hooks/useBars';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { stockMovementsApi } from '@/lib/api/dashbar';
 import type { GlobalInventory, AssignStockDto } from '@/lib/api/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Package, Beaker, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 
 interface AssignStockDialogProps {
   inventory: GlobalInventory;
@@ -44,10 +47,30 @@ export function AssignStockDialog({
   const [quantity, setQuantity] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
 
+  const [sellAsWholeUnit, setSellAsWholeUnit] = useState(true);
+  const [salePrice, setSalePrice] = useState<string>('');
+
   const eventIdNum = selectedEventId ? parseInt(selectedEventId, 10) : 0;
   const { data: bars = [], isLoading: isLoadingBars } = useBars(eventIdNum);
 
   const availableQuantity = inventory.totalQuantity - inventory.allocatedQuantity;
+
+  // Costo unitario en pesos (convertido desde centavos)
+  const unitCostInPesos = inventory.unitCost / 100;
+
+  // Cálculo del margen de ganancia
+  const profitMargin = useMemo(() => {
+    const salePriceNum = parseFloat(salePrice);
+    if (!salePriceNum || salePriceNum <= 0 || unitCostInPesos <= 0) return null;
+    
+    const profit = salePriceNum - unitCostInPesos;
+    const margin = (profit / unitCostInPesos) * 100;
+    return {
+      profit,
+      margin,
+      isPositive: margin > 0,
+    };
+  }, [salePrice, unitCostInPesos]);
 
   const assignMutation = useMutation({
     mutationFn: (dto: AssignStockDto) => stockMovementsApi.assign(dto),
@@ -71,6 +94,8 @@ export function AssignStockDialog({
     setSelectedBarId('');
     setQuantity('');
     setNotes('');
+    setSellAsWholeUnit(true);
+    setSalePrice('');
   };
 
   useEffect(() => {
@@ -100,12 +125,23 @@ export function AssignStockDialog({
       return;
     }
 
+    // Validar precio si es venta directa
+    if (sellAsWholeUnit) {
+      const price = parseFloat(salePrice);
+      if (!price || price <= 0) {
+        toast.error('El precio de venta es requerido para venta directa');
+        return;
+      }
+    }
+
     const dto: AssignStockDto = {
       globalInventoryId: inventory.id,
       eventId: parseInt(selectedEventId, 10),
       barId: parseInt(selectedBarId, 10),
       quantity: quantityNum,
       notes: notes || undefined,
+      sellAsWholeUnit,
+      salePrice: sellAsWholeUnit ? Math.round(parseFloat(salePrice) * 100) : undefined,
     };
 
     assignMutation.mutate(dto);
@@ -121,7 +157,7 @@ export function AssignStockDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto px-1">
             <div className="space-y-2">
               <Label>Item</Label>
               <div className="rounded-lg border p-3 bg-muted/50">
@@ -139,27 +175,40 @@ export function AssignStockDialog({
               <Label htmlFor="eventId">
                 Evento <span className="text-destructive">*</span>
               </Label>
-              <Select
-                value={selectedEventId}
-                onValueChange={(value) => {
-                  setSelectedEventId(value);
-                  setSelectedBarId(''); // Reset bar when event changes
-                }}
-                disabled={assignMutation.isPending}
-              >
-                <SelectTrigger id="eventId">
-                  <SelectValue placeholder="Seleccionar evento" />
-                </SelectTrigger>
-                <SelectContent>
-                  {events
-                    .filter((e) => e.status === 'upcoming' || e.status === 'active')
-                    .map((event) => (
-                      <SelectItem key={event.id} value={event.id.toString()}>
-                        {event.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              {events.filter((e) => e.status === 'upcoming' || e.status === 'active').length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">
+                  No hay eventos activos.{' '}
+                  <Link
+                    to="/events"
+                    className="text-primary underline-offset-4 hover:underline"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    Crear uno
+                  </Link>
+                </p>
+              ) : (
+                <Select
+                  value={selectedEventId}
+                  onValueChange={(value) => {
+                    setSelectedEventId(value);
+                    setSelectedBarId(''); // Reset bar when event changes
+                  }}
+                  disabled={assignMutation.isPending}
+                >
+                  <SelectTrigger id="eventId">
+                    <SelectValue placeholder="Seleccionar evento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {events
+                      .filter((e) => e.status === 'upcoming' || e.status === 'active')
+                      .map((event) => (
+                        <SelectItem key={event.id} value={event.id.toString()}>
+                          {event.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -212,6 +261,86 @@ export function AssignStockDialog({
               </p>
             </div>
 
+            {/* Toggle para venta directa vs componente de receta */}
+            <div className="rounded-xl border bg-muted/30 p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {sellAsWholeUnit ? (
+                    <Package className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <Beaker className="h-5 w-5 text-blue-600" />
+                  )}
+                  <div>
+                    <Label htmlFor="sellAsWholeUnit" className="cursor-pointer text-sm font-medium">
+                      {sellAsWholeUnit ? 'Venta directa' : 'Componente para recetas'}
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {sellAsWholeUnit
+                        ? 'Se vende como unidad completa (ej: botella de agua)'
+                        : 'Se usa como ingrediente en recetas'}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="sellAsWholeUnit"
+                  checked={sellAsWholeUnit}
+                  onCheckedChange={setSellAsWholeUnit}
+                  disabled={assignMutation.isPending}
+                />
+              </div>
+
+              {sellAsWholeUnit && (
+                <div className="space-y-3 pt-3 border-t">
+                  {/* Helper: Costo unitario */}
+                  <div className="flex items-center justify-between text-sm bg-slate-50 dark:bg-slate-900 rounded-lg px-3 py-2">
+                    <span className="text-muted-foreground">Costo unitario:</span>
+                    <span className="font-medium">${unitCostInPesos.toFixed(2)}</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="salePrice">
+                      Precio de venta ($) <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="salePrice"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={salePrice}
+                      onChange={(e) => setSalePrice(e.target.value)}
+                      disabled={assignMutation.isPending}
+                      placeholder="Ej: 5.00"
+                      required={sellAsWholeUnit}
+                    />
+                  </div>
+
+                  {/* Helper: Margen de ganancia */}
+                  {profitMargin && (
+                    <div className={`flex items-center justify-between text-sm rounded-lg px-3 py-2 ${
+                      profitMargin.isPositive 
+                        ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300' 
+                        : 'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className={`h-4 w-4 ${profitMargin.isPositive ? '' : 'rotate-180'}`} />
+                        <span>Margen de ganancia:</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-semibold">{profitMargin.margin.toFixed(1)}%</span>
+                        <span className="text-xs ml-1">
+                          (${profitMargin.profit.toFixed(2)} por unidad)
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-xs text-muted-foreground">
+                    Este insumo aparecerá automáticamente como producto disponible para venta
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="notes">Notas (opcional)</Label>
               <Textarea
@@ -224,7 +353,7 @@ export function AssignStockDialog({
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-6">
             <Button
               type="button"
               variant="outline"

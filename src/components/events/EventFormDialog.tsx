@@ -22,6 +22,7 @@ import { useCreateEvent, useUpdateEvent } from '@/hooks/useEvents';
 import { useVenues } from '@/hooks/useVenues';
 import type { Event, CreateEventDto, UpdateEventDto } from '@/lib/api/types';
 import { Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface EventFormDialogProps {
@@ -163,24 +164,31 @@ export function EventFormDialog({
               <Label htmlFor="venue">
                 Venue <span className="text-destructive">*</span>
               </Label>
-              <Select value={venueId} onValueChange={setVenueId} disabled={isSubmitting || isLoadingVenues}>
-                <SelectTrigger id="venue">
-                  <SelectValue placeholder={isLoadingVenues ? "Loading venues..." : "Select a venue"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {venues.length === 0 && !isLoadingVenues ? (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                      No venues available. Create one first.
-                    </div>
-                  ) : (
-                    venues.map((venue) => (
+              {venues.length === 0 && !isLoadingVenues ? (
+                <p className="text-sm text-muted-foreground py-2">
+                  No hay venues.{' '}
+                  <Link
+                    to="/venues"
+                    className="text-primary underline-offset-4 hover:underline"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    Crear uno
+                  </Link>
+                </p>
+              ) : (
+                <Select value={venueId} onValueChange={setVenueId} disabled={isSubmitting || isLoadingVenues}>
+                  <SelectTrigger id="venue">
+                    <SelectValue placeholder={isLoadingVenues ? "Cargando..." : "Seleccionar venue"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {venues.map((venue) => (
                       <SelectItem key={venue.id} value={venue.id.toString()}>
                         {venue.name}
                       </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

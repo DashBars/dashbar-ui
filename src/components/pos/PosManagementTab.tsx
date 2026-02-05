@@ -1,25 +1,25 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Monitor, Activity, TrendingUp, AlertTriangle } from 'lucide-react';
-import { PosTable } from '@/components/pos/PosTable';
-import { PosFormDialog } from '@/components/pos/PosFormDialog';
+import { useEventPosnets } from '@/hooks/usePosnets';
+import { PosTable } from './PosTable';
+import { PosFormDialog } from './PosFormDialog';
 import type { Posnet } from '@/lib/api/types';
 
-interface PosnetsTabProps {
-  posnets: Posnet[];
+interface PosManagementTabProps {
   eventId: number;
-  barId: number;
-  isLoading?: boolean;
 }
 
-export function PosnetsTab({ posnets, eventId, barId, isLoading }: PosnetsTabProps) {
+export function PosManagementTab({ eventId }: PosManagementTabProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPosnet, setEditingPosnet] = useState<Posnet | null>(null);
 
-  // Calculate stats for this bar's posnets
+  const { data: posnets = [], isLoading } = useEventPosnets(eventId);
+
+  // Calculate stats
   const openCount = posnets.filter((p) => p.status === 'OPEN').length;
   const congestedCount = posnets.filter((p) => p.status === 'CONGESTED').length;
   const avgTraffic =
@@ -59,7 +59,7 @@ export function PosnetsTab({ posnets, eventId, barId, isLoading }: PosnetsTabPro
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Terminales
+              Total Terminals
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -73,18 +73,16 @@ export function PosnetsTab({ posnets, eventId, barId, isLoading }: PosnetsTabPro
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Abiertas
+              Open
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-green-500" />
               <span className="text-2xl font-bold">{openCount}</span>
-              {openCount > 0 && (
-                <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
-                  Activas
-                </Badge>
-              )}
+              <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
+                Active
+              </Badge>
             </div>
           </CardContent>
         </Card>
@@ -92,7 +90,7 @@ export function PosnetsTab({ posnets, eventId, barId, isLoading }: PosnetsTabPro
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Congestionadas
+              Congested
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -104,7 +102,7 @@ export function PosnetsTab({ posnets, eventId, barId, isLoading }: PosnetsTabPro
                   variant="outline"
                   className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
                 >
-                  Alerta
+                  Warning
                 </Badge>
               )}
             </div>
@@ -114,7 +112,7 @@ export function PosnetsTab({ posnets, eventId, barId, isLoading }: PosnetsTabPro
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Tráfico Prom.
+              Avg. Traffic
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -138,14 +136,14 @@ export function PosnetsTab({ posnets, eventId, barId, isLoading }: PosnetsTabPro
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Terminales POS</CardTitle>
+            <CardTitle>POS Terminals</CardTitle>
             <CardDescription>
-              Gestiona los terminales punto de venta de esta barra
+              Manage point-of-sale terminals for this event
             </CardDescription>
           </div>
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Agregar Terminal
+            Add Terminal
           </Button>
         </CardHeader>
         <CardContent>
@@ -159,7 +157,6 @@ export function PosnetsTab({ posnets, eventId, barId, isLoading }: PosnetsTabPro
         onOpenChange={handleCloseDialog}
         eventId={eventId}
         editingPosnet={editingPosnet}
-        defaultBarId={barId}
       />
     </div>
   );

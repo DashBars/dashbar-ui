@@ -86,6 +86,8 @@ export function ReturnStockDialog({
       eventId,
       barId: stock.barId,
       drinkId: stock.drinkId,
+      supplierId: stock.supplierId,
+      sellAsWholeUnit: stock.sellAsWholeUnit,
       quantity: quantityNum,
       notes: notes || undefined,
     };

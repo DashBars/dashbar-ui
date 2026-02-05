@@ -114,19 +114,36 @@ export function BarFormDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="status">Status</Label>
-              <Select value={status} onValueChange={(value) => setStatus(value as BarStatus)}>
-                <SelectTrigger id="status">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                  <SelectItem value="lowStock">Low Stock</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {isEdit ? (
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select value={status} onValueChange={(value) => setStatus(value as BarStatus)}>
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                    <SelectItem value="lowStock">Low Stock</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select value="closed" disabled>
+                  <SelectTrigger id="status" className="bg-muted text-muted-foreground">
+                    <SelectValue placeholder="Closed" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Las barras se crean cerradas. Podrás abrirlas al activar el evento.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button

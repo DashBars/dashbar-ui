@@ -3,7 +3,6 @@
 export type BarType = 'VIP' | 'general' | 'backstage' | 'lounge';
 export type BarStatus = 'open' | 'closed' | 'lowStock';
 export type OwnershipMode = 'purchased' | 'consignment';
-export type PosnetStatus = 'active' | 'inactive';
 
 // Bar types
 export interface Bar {
@@ -38,6 +37,8 @@ export interface Stock {
   currency: string;
   ownershipMode: OwnershipMode;
   receivedAt: string;
+  sellAsWholeUnit: boolean;
+  salePrice?: number;
   drink?: Drink;
   supplier?: Supplier;
 }
@@ -204,12 +205,160 @@ export interface UpdateRecipeDto {
   components?: RecipeComponentDto[];
 }
 
-// Posnet types
+// Posnet types (POS Terminal)
+export type PosnetStatus = 'OPEN' | 'CONGESTED' | 'CLOSED';
+export type POSSaleStatus = 'PENDING' | 'COMPLETED' | 'REFUNDED' | 'VOIDED';
+export type POSPaymentMethod = 'cash' | 'card' | 'digital';
+
 export interface Posnet {
   id: number;
+  code: string;
+  name: string;
   status: PosnetStatus;
+  enabled: boolean;
   traffic: number;
+  eventId: number;
   barId: number;
+  lastHeartbeatAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  bar?: Bar;
+  event?: Event;
+}
+
+export interface CreatePosnetDto {
+  name: string;
+  barId: number;
+  code?: string;
+}
+
+export interface UpdatePosnetDto {
+  name?: string;
+  enabled?: boolean;
+  status?: PosnetStatus;
+}
+
+export interface POSLoginResponse {
+  accessToken: string;
+  posnet: Posnet;
+}
+
+export interface POSSession {
+  id: number;
+  posnetId: number;
+  openedById: number;
+  openedAt: string;
+  closedAt?: string;
+  openingCash: number;
+  closingCash?: number;
+  expectedCash?: number;
+  notes?: string;
+}
+
+export interface POSSale {
+  id: number;
+  posnetId: number;
+  sessionId?: number;
+  eventId: number;
+  barId: number;
+  cashierId?: number;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  status: POSSaleStatus;
+  idempotencyKey?: string;
+  createdAt: string;
+  completedAt?: string;
+  items: POSSaleItem[];
+  payments: POSPayment[];
+}
+
+export interface POSSaleItem {
+  id: number;
+  saleId: number;
+  productId: number;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+}
+
+export interface POSPayment {
+  id: number;
+  saleId: number;
+  method: POSPaymentMethod;
+  amount: number;
+  reference?: string;
+  status: 'SUCCESS' | 'FAILED';
+  processedAt: string;
+}
+
+export interface POSConfig {
+  posnet: Posnet;
+  event: { id: number; name: string };
+  bar: { id: number; name: string; type: string };
+  products: POSProduct[];
+  categories: string[];
+  session?: POSSession;
+}
+
+export interface POSProductComponent {
+  drinkId: number;
+  drinkName: string;
+  drinkBrand: string;
+  percentage: number;
+}
+
+export interface POSProduct {
+  id: number;
+  name: string;
+  price: number;
+  category?: string;
+  available: boolean;
+  stockLevel?: number;
+  imageUrl?: string;
+  // Recipe details
+  glassVolume?: number;
+  hasIce?: boolean;
+  components?: POSProductComponent[];
+}
+
+export interface CartItem {
+  product: POSProduct;
+  quantity: number;
+}
+
+export interface CreatePOSSaleDto {
+  items: Array<{
+    productId: number;
+    quantity: number;
+    unitPrice: number;
+  }>;
+  paymentMethod: POSPaymentMethod;
+  paymentAmount?: number;
+  idempotencyKey?: string;
+}
+
+export interface ReceiptData {
+  saleId: number;
+  receiptNumber: string;
+  posnetName: string;
+  barName: string;
+  eventName: string;
+  items: Array<{
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+  }>;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  paymentMethod: POSPaymentMethod;
+  createdAt: string;
+  cashierName?: string;
 }
 
 // Auth types
@@ -273,7 +422,16 @@ export interface ExecuteReturnResult {
 }
 
 // Inventory Movement types
-export type MovementType = 'sale' | 'adjustment' | 'return_' | 'transfer';
+export type MovementType = 'sale' | 'adjustment' | 'return_' | 'transfer' | 'transfer_in' | 'transfer_out';
+
+export type StockMovementReason = 
+  | 'ASSIGN_TO_BAR'
+  | 'MOVE_BETWEEN_BARS'
+  | 'RETURN_TO_GLOBAL'
+  | 'SALE_DECREMENT'
+  | 'ADJUSTMENT'
+  | 'RETURN_TO_PROVIDER'
+  | 'INITIAL_LOAD';
 
 export interface InventoryMovement {
   id: number;
@@ -282,6 +440,12 @@ export interface InventoryMovement {
   supplierId: number;
   quantity: number; // Negative for deductions, positive for additions
   type: MovementType;
+  reason?: StockMovementReason;
+  sellAsWholeUnit?: boolean;
+  fromLocationType?: 'GLOBAL' | 'BAR';
+  fromLocationId?: number;
+  toLocationType?: 'GLOBAL' | 'BAR';
+  toLocationId?: number;
   referenceId?: number;
   notes?: string;
   createdAt: string;
@@ -450,6 +614,9 @@ export interface AssignStockDto {
   barId: number;
   quantity: number;
   notes?: string;
+  // Venta directa: si true, el insumo se vende como unidad completa (ej: botella de agua)
+  sellAsWholeUnit?: boolean;
+  salePrice?: number; // Precio de venta en centavos (requerido si sellAsWholeUnit=true)
 }
 
 export interface MoveStockDto {
@@ -465,6 +632,8 @@ export interface ReturnStockDto {
   eventId: number;
   barId: number;
   drinkId: number;
+  supplierId: number;
+  sellAsWholeUnit: boolean;
   quantity: number;
   notes?: string;
 }
@@ -518,4 +687,179 @@ export interface UpdateProductDto {
   name?: string;
   price?: number; // cents
   cocktailIds?: number[];
+}
+
+// ============= REPORT TYPES =============
+
+export type BucketSize = 5 | 15 | 60;
+
+export interface TopProductEntry {
+  cocktailId: number;
+  name: string;
+  unitsSold: number;
+  revenue: number;
+  sharePercent: number;
+  profit?: number;
+}
+
+export interface PeakHourEntry {
+  hour: string;
+  units: number;
+  revenue: number;
+  orderCount: number;
+}
+
+export interface PeakHourBucketEntry {
+  startTime: string;
+  endTime: string;
+  salesCount: number;
+  revenue: number;
+  topProduct?: string;
+}
+
+export interface TimeSeriesEntry {
+  timestamp: string;
+  units: number;
+  amount: number;
+}
+
+export interface RemainingStockEntry {
+  barId: number;
+  barName: string;
+  drinkId: number;
+  drinkName: string;
+  supplierId: number;
+  supplierName: string;
+  quantity: number;
+  unitCost: number;
+  totalValue: number;
+  ownershipMode: 'purchased' | 'consignment';
+}
+
+export interface ConsumptionBySupplier {
+  supplierId: number;
+  supplierName: string;
+  quantity: number;
+  unitCost: number;
+  cost: number;
+  ownershipMode: 'purchased' | 'consignment';
+}
+
+export interface ConsumptionEntry {
+  drinkId: number;
+  drinkName: string;
+  totalMl: number;
+  totalCost: number;
+  bySupplier: ConsumptionBySupplier[];
+}
+
+export interface ReportSummary {
+  totalRevenue: number;
+  totalCOGS: number;
+  grossProfit: number;
+  marginPercent: number;
+  totalUnitsSold: number;
+  totalOrderCount: number;
+}
+
+export interface RemainingStockSummary {
+  totalValue: number;
+  purchasedValue: number;
+  consignmentValue: number;
+  items: RemainingStockEntry[];
+}
+
+export interface BarBreakdown {
+  barId: number;
+  barName: string;
+  barType: string;
+  totalRevenue: number;
+  totalCOGS: number;
+  grossProfit: number;
+  marginPercent: number;
+  totalUnitsSold: number;
+  totalOrderCount: number;
+  avgTicketSize: number;
+  topProducts: TopProductEntry[];
+  peakHours: PeakHourEntry[];
+}
+
+export interface PosBreakdown {
+  posnetId: number;
+  posnetCode: string;
+  posnetName: string;
+  barId: number;
+  barName: string;
+  totalRevenue: number;
+  totalTransactions: number;
+  totalUnitsSold: number;
+  avgTicketSize: number;
+  busiestHours: Array<{
+    hour: string;
+    transactions: number;
+    revenue: number;
+  }>;
+}
+
+export interface StockValuationItem {
+  drinkId: number;
+  drinkName: string;
+  quantity: number;
+  unitCost: number;
+  value: number;
+  ownershipMode: 'purchased' | 'consignment';
+}
+
+export interface BarStockValuation {
+  barId: number;
+  barName: string;
+  totalValue: number;
+  purchasedValue: number;
+  consignmentValue: number;
+  items: StockValuationItem[];
+}
+
+export interface StockValuationSummary {
+  totalValue: number;
+  purchasedValue: number;
+  consignmentValue: number;
+  byBar: BarStockValuation[];
+}
+
+export interface CogsBreakdownByBar {
+  barId: number;
+  barName: string;
+  totalCogs: number;
+  byDrink: Array<{
+    drinkId: number;
+    drinkName: string;
+    quantityUsed: number;
+    cost: number;
+  }>;
+}
+
+export interface EventReportData {
+  summary: ReportSummary;
+  topProducts: TopProductEntry[];
+  peakHours: PeakHourEntry[];
+  timeSeries: TimeSeriesEntry[];
+  remainingStock: RemainingStockSummary;
+  consumptionByDrink: ConsumptionEntry[];
+  warnings: string[];
+  // Enhanced fields
+  peakHoursByBucket?: {
+    '5min': PeakHourBucketEntry[];
+    '15min': PeakHourBucketEntry[];
+    '60min': PeakHourBucketEntry[];
+  };
+  barBreakdowns?: BarBreakdown[];
+  posBreakdowns?: PosBreakdown[];
+  stockValuation?: StockValuationSummary;
+  cogsBreakdown?: CogsBreakdownByBar[];
+  csvPath?: string;
+  pdfPath?: string;
+}
+
+export interface GenerateReportDto {
+  bucketSize?: BucketSize;
 }

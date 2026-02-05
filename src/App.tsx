@@ -12,6 +12,7 @@ import { BarInventoryPage } from './pages/BarInventoryPage';
 import { BarManagementPage } from './pages/BarManagementPage';
 import { BarTabRedirect } from './pages/BarTabRedirect';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { POSLoginPage, POSKioskPage, POSReceiptPage } from './pages/pos';
 import { AppShell } from './components/layout/AppShell';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import './App.css';
@@ -41,6 +42,10 @@ function App() {
               path="/"
               element={<RootRedirect />}
             />
+            {/* POS Routes - Outside protected routes, uses POS token auth */}
+            <Route path="/pos/login" element={<POSLoginPage />} />
+            <Route path="/pos/:posnetId/kiosk" element={<POSKioskPage />} />
+            <Route path="/pos/:posnetId/receipt/:saleId" element={<POSReceiptPage />} />
             <Route
               element={
                 <ProtectedRoute>

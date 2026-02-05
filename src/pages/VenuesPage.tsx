@@ -69,10 +69,12 @@ export function VenuesPage() {
             Manage your venues and locations
           </p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create venue
-        </Button>
+        {venues.length > 0 && (
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create venue
+          </Button>
+        )}
       </div>
 
       {venues.length === 0 && !isLoading ? (

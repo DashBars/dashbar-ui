@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Trash2 } from 'lucide-react';
+import { Trash2, ArrowLeft, Wine, Monitor, Package } from 'lucide-react';
 import { useDeleteBar } from '@/hooks/useBars';
 import { BarMovementsTab } from '@/components/bars/BarMovementsTab';
 
@@ -71,29 +71,40 @@ export function BarManagementPage() {
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <nav className="text-sm text-muted-foreground mb-2" aria-label="Breadcrumb">
-            <Link to="/events" className="hover:text-foreground transition-colors">
-              Events
-            </Link>
-            <span className="mx-2">/</span>
-            <Link
-              to={`/events/${eventIdNum}`}
-              className="hover:text-foreground transition-colors"
+          <div className="flex items-center gap-3 mb-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={() => navigate(`/events/${eventIdNum}`)}
             >
-              {event?.name || `Event ${eventIdNum}`}
-            </Link>
-            <span className="mx-2">/</span>
-            <Link
-              to={`/events/${eventIdNum}`}
-              className="hover:text-foreground transition-colors"
-            >
-              Bars
-            </Link>
-            <span className="mx-2">/</span>
-            <span className="text-foreground font-medium">
-              {bar?.name || `Bar ${barIdNum}`}
-            </span>
-          </nav>
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Volver</span>
+            </Button>
+            <nav className="text-sm text-muted-foreground" aria-label="Breadcrumb">
+              <Link to="/events" className="hover:text-foreground transition-colors">
+                Events
+              </Link>
+              <span className="mx-2">/</span>
+              <Link
+                to={`/events/${eventIdNum}`}
+                className="hover:text-foreground transition-colors"
+              >
+                {event?.name || `Event ${eventIdNum}`}
+              </Link>
+              <span className="mx-2">/</span>
+              <Link
+                to={`/events/${eventIdNum}`}
+                className="hover:text-foreground transition-colors"
+              >
+                Bars
+              </Link>
+              <span className="mx-2">/</span>
+              <span className="text-foreground font-medium">
+                {bar?.name || `Bar ${barIdNum}`}
+              </span>
+            </nav>
+          </div>
 
           <h1 className="text-3xl font-bold tracking-tight">
             {isLoading ? <Skeleton className="h-9 w-64" /> : bar?.name}
@@ -149,40 +160,57 @@ export function BarManagementPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <Card className="rounded-2xl">
-            <CardContent className="p-6">
-              {isLoading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-4 w-48" />
-                  <Skeleton className="h-4 w-64" />
-                  <Skeleton className="h-4 w-56" />
-                </div>
-              ) : (
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Nombre</span>
-                    <span className="font-medium">{bar?.name}</span>
+          {isLoading ? (
+            <div className="grid gap-4 md:grid-cols-3">
+              <Skeleton className="h-28 rounded-2xl" />
+              <Skeleton className="h-28 rounded-2xl" />
+              <Skeleton className="h-28 rounded-2xl" />
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card className="rounded-2xl">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-xl bg-primary/10 p-3">
+                      <Wine className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Tipo de barra</p>
+                      <p className="text-2xl font-semibold capitalize">{bar?.type}</p>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tipo</span>
-                    <span className="font-medium">{bar?.type}</span>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-xl bg-blue-500/10 p-3">
+                      <Monitor className="h-6 w-6 text-blue-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Dispositivos POS</p>
+                      <p className="text-2xl font-semibold">{bar?.posnets?.length || 0}</p>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Estado</span>
-                    <span className="font-medium">{bar?.status}</span>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-xl bg-green-500/10 p-3">
+                      <Package className="h-6 w-6 text-green-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Items en stock</p>
+                      <p className="text-2xl font-semibold">{bar?.stocks?.length || 0}</p>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">POS Devices</span>
-                    <span className="font-medium">{bar?.posnets?.length || 0}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Stock items</span>
-                    <span className="font-medium">{bar?.stocks?.length || 0}</span>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="stock" className="space-y-4">
@@ -194,7 +222,12 @@ export function BarManagementPage() {
         </TabsContent>
 
         <TabsContent value="pos" className="space-y-4">
-          <PosnetsTab posnets={bar?.posnets || []} />
+          <PosnetsTab
+            posnets={bar?.posnets || []}
+            eventId={eventIdNum}
+            barId={barIdNum}
+            isLoading={isLoadingBar}
+          />
         </TabsContent>
 
         <TabsContent value="movements" className="space-y-4">

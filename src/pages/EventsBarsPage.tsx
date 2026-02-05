@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { BarsPageHeader } from '@/components/bars/BarsPageHeader';
 import { BarsSummaryCards } from '@/components/bars/BarsSummaryCards';
 import { BarsFilters } from '@/components/bars/BarsFilters';
@@ -52,6 +54,30 @@ export function EventsBarsPage() {
     
     return (
       <div className="container mx-auto p-6 max-w-7xl">
+        {/* Breadcrumbs with back button */}
+        <div className="flex items-center gap-3 mb-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={() => navigate(`/events/${eventIdNum}`)}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="sr-only">Volver</span>
+          </Button>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Link to="/events" className="hover:text-foreground">
+              Events
+            </Link>
+            <ChevronRight className="h-4 w-4" />
+            <Link to={`/events/${eventIdNum}`} className="hover:text-foreground">
+              {event?.name || `Event ${eventIdNum}`}
+            </Link>
+            <ChevronRight className="h-4 w-4" />
+            <span className="text-foreground">Bars</span>
+          </div>
+        </div>
+
         <BarsPageHeader
           eventId={eventIdNum}
           eventName={event?.name}
@@ -75,6 +101,30 @@ export function EventsBarsPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
+      {/* Breadcrumbs with back button */}
+      <div className="flex items-center gap-3 mb-6">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0"
+          onClick={() => navigate(`/events/${eventIdNum}`)}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span className="sr-only">Volver</span>
+        </Button>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Link to="/events" className="hover:text-foreground">
+            Events
+          </Link>
+          <ChevronRight className="h-4 w-4" />
+          <Link to={`/events/${eventIdNum}`} className="hover:text-foreground">
+            {event?.name || `Event ${eventIdNum}`}
+          </Link>
+          <ChevronRight className="h-4 w-4" />
+          <span className="text-foreground">Bars</span>
+        </div>
+      </div>
+
       <BarsPageHeader
         eventId={eventIdNum}
         eventName={event?.name}

@@ -40,7 +40,6 @@ export function VenueFormDialog({
 
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
-  const [addressLine2, setAddressLine2] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [country, setCountry] = useState('');
@@ -52,7 +51,6 @@ export function VenueFormDialog({
     if (open) {
       setName(venue?.name || '');
       setAddress(venue?.address || '');
-      setAddressLine2(venue?.addressLine2 || '');
       setCity(venue?.city || '');
       setState(venue?.state || '');
       setCountry(venue?.country || '');
@@ -69,7 +67,6 @@ export function VenueFormDialog({
       const dto: UpdateVenueDto = {
         name,
         address,
-        addressLine2: addressLine2 || undefined,
         city,
         state: state || undefined,
         country,
@@ -84,7 +81,6 @@ export function VenueFormDialog({
       const dto: CreateVenueDto = {
         name,
         address,
-        addressLine2: addressLine2 || undefined,
         city,
         state: state || undefined,
         country,
@@ -112,7 +108,7 @@ export function VenueFormDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto px-1">
             <div className="space-y-2">
               <Label htmlFor="name">
                 Name <span className="text-destructive">*</span>
@@ -137,16 +133,6 @@ export function VenueFormDialog({
                 required
                 disabled={isSubmitting}
                 placeholder="Street address"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="addressLine2">Address Line 2</Label>
-              <Input
-                id="addressLine2"
-                value={addressLine2}
-                onChange={(e) => setAddressLine2(e.target.value)}
-                disabled={isSubmitting}
-                placeholder="Apartment, suite, etc. (optional)"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -232,7 +218,7 @@ export function VenueFormDialog({
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-6">
             <Button
               type="button"
               variant="outline"

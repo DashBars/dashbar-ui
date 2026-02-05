@@ -23,6 +23,7 @@ import { useBars } from '@/hooks/useBars';
 import type { ManagerInventory, TransferToBarDto } from '@/lib/api/types';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 interface TransferToBarDialogProps {
   inventory: ManagerInventory;
@@ -130,22 +131,35 @@ export function TransferToBarDialog({
               <Label htmlFor="eventId">
                 Evento <span className="text-destructive">*</span>
               </Label>
-              <Select
-                value={eventId}
-                onValueChange={setEventId}
-                disabled={isPending}
-              >
-                <SelectTrigger id="eventId">
-                  <SelectValue placeholder="Seleccionar evento" />
-                </SelectTrigger>
-                <SelectContent>
-                  {events.map((event) => (
-                    <SelectItem key={event.id} value={event.id.toString()}>
-                      {event.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {events.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">
+                  No hay eventos.{' '}
+                  <Link
+                    to="/events"
+                    className="text-primary underline-offset-4 hover:underline"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    Crear uno
+                  </Link>
+                </p>
+              ) : (
+                <Select
+                  value={eventId}
+                  onValueChange={setEventId}
+                  disabled={isPending}
+                >
+                  <SelectTrigger id="eventId">
+                    <SelectValue placeholder="Seleccionar evento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {events.map((event) => (
+                      <SelectItem key={event.id} value={event.id.toString()}>
+                        {event.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             {eventId && (
               <div className="space-y-2">

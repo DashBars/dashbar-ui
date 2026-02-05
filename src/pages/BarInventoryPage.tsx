@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -6,7 +6,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useStockSummary, useStock } from '@/hooks/useStock';
 import { stockApi } from '@/lib/api/dashbar';
 import { useQuery } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, ArrowLeft } from 'lucide-react';
+import { useEvent } from '@/hooks/useEvents';
+import { useBar } from '@/hooks/useBars';
 import { useState } from 'react';
 import { InventoryReceiptDialog } from '@/components/inventory/InventoryReceiptDialog';
 import { StockOnHandTab } from '@/components/inventory/StockOnHandTab';
@@ -17,7 +19,10 @@ export function BarInventoryPage() {
   const { eventId, barId } = useParams<{ eventId: string; barId: string }>();
   const eventIdNum = parseInt(eventId || '0', 10);
   const barIdNum = parseInt(barId || '0', 10);
+  const navigate = useNavigate();
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  const { data: event } = useEvent(eventIdNum);
+  const { data: bar } = useBar(eventIdNum, barIdNum);
 
   const { data: summary = [], isLoading: summaryLoading } = useStockSummary(
     eventIdNum,
@@ -56,6 +61,38 @@ export function BarInventoryPage() {
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="flex items-center justify-between mb-6">
         <div>
+          <div className="flex items-center gap-3 mb-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={() => navigate(`/events/${eventIdNum}/bars/${barIdNum}`)}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Volver</span>
+            </Button>
+            <nav className="text-sm text-muted-foreground" aria-label="Breadcrumb">
+              <Link to="/events" className="hover:text-foreground transition-colors">
+                Events
+              </Link>
+              <span className="mx-2">/</span>
+              <Link
+                to={`/events/${eventIdNum}`}
+                className="hover:text-foreground transition-colors"
+              >
+                {event?.name || `Event ${eventIdNum}`}
+              </Link>
+              <span className="mx-2">/</span>
+              <Link
+                to={`/events/${eventIdNum}/bars/${barIdNum}`}
+                className="hover:text-foreground transition-colors"
+              >
+                {bar?.name || `Bar ${barIdNum}`}
+              </Link>
+              <span className="mx-2">/</span>
+              <span className="text-foreground font-medium">Inventory</span>
+            </nav>
+          </div>
           <h1 className="text-3xl font-bold tracking-tight">Bar Inventory</h1>
           <p className="text-muted-foreground mt-1">
             Manage stock, receipts, and consignment returns

@@ -27,6 +27,7 @@ import { useManagerInventory } from '@/hooks/useManagerInventory';
 import { TransferToBarDialog } from './TransferToBarDialog';
 import type { Stock } from '@/lib/api/types';
 import { Plus, Trash2, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export function BarStockManagement() {
   const { data: events = [] } = useEvents();
@@ -99,21 +100,33 @@ export function BarStockManagement() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Evento</label>
-              <Select
-                value={selectedEventId}
-                onValueChange={handleEventChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar evento" />
-                </SelectTrigger>
-                <SelectContent>
-                  {events.map((event) => (
-                    <SelectItem key={event.id} value={event.id.toString()}>
-                      {event.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {events.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">
+                  No hay eventos.{' '}
+                  <Link
+                    to="/events"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    Crear uno
+                  </Link>
+                </p>
+              ) : (
+                <Select
+                  value={selectedEventId}
+                  onValueChange={handleEventChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar evento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {events.map((event) => (
+                      <SelectItem key={event.id} value={event.id.toString()}>
+                        {event.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Barra</label>

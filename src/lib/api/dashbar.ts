@@ -51,6 +51,16 @@ import type {
   EventProduct,
   CreateProductDto,
   UpdateProductDto,
+  Posnet,
+  CreatePosnetDto,
+  UpdatePosnetDto,
+  POSLoginResponse,
+  POSConfig,
+  POSProduct,
+  POSSession,
+  POSSale,
+  CreatePOSSaleDto,
+  ReceiptData,
 } from './types';
 
 // Configure axios base URL - adjust this to match your backend URL
@@ -698,5 +708,251 @@ export const venuesApi = {
 
   deleteVenue: async (id: number): Promise<void> => {
     await api.delete(`/venues/${id}`);
+  },
+};
+
+// POS Management API (for managers/admins)
+export const posnetsApi = {
+  getPosnets: async (eventId: number): Promise<Posnet[]> => {
+    const response = await api.get<Posnet[]>(`/events/${eventId}/posnets`);
+    return response.data;
+  },
+
+  getPosnet: async (id: number): Promise<Posnet> => {
+    const response = await api.get<Posnet>(`/posnets/${id}`);
+    return response.data;
+  },
+
+  createPosnet: async (eventId: number, dto: CreatePosnetDto): Promise<Posnet> => {
+    const response = await api.post<Posnet>(`/events/${eventId}/posnets`, dto);
+    return response.data;
+  },
+
+  updatePosnet: async (id: number, dto: UpdatePosnetDto): Promise<Posnet> => {
+    const response = await api.patch<Posnet>(`/posnets/${id}`, dto);
+    return response.data;
+  },
+
+  deletePosnet: async (id: number): Promise<void> => {
+    await api.delete(`/posnets/${id}`);
+  },
+
+  rotateToken: async (id: number): Promise<{ authToken: string }> => {
+    const response = await api.post<{ authToken: string }>(`/posnets/${id}/rotate-token`);
+    return response.data;
+  },
+};
+
+// POS Device API (for kiosk devices)
+// Create a separate axios instance for POS API calls that uses POS token
+const posApi = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add POS token interceptor
+posApi.interceptors.request.use((config) => {
+  const posToken = localStorage.getItem('pos_token');
+  if (posToken) {
+    config.headers['X-POS-Token'] = posToken;
+  }
+  return config;
+});
+
+export const posDeviceApi = {
+  // Login with POS code
+  login: async (code: string): Promise<POSLoginResponse> => {
+    const response = await axios.post<POSLoginResponse>(
+      `${API_BASE_URL}/pos/login`,
+      { code }
+    );
+    return response.data;
+  },
+
+  // Get POS config (products, session, etc.)
+  getConfig: async (posnetId: number): Promise<POSConfig> => {
+    // Backend returns catalog with products filtered by bar
+    const response = await posApi.get(`/pos/${posnetId}/config`);
+    const data = response.data as {
+      posnet: POSConfig['posnet'];
+      event: { id: number; name: string };
+      bar: { id: number; name: string; type: string };
+      catalog: {
+        products?: Array<{
+          id: number;
+          name: string;
+          price: number;
+          isCombo: boolean;
+          glassVolume?: number;
+          hasIce?: boolean;
+          components?: Array<{
+            drinkId: number;
+            drinkName: string;
+            drinkBrand: string;
+            percentage: number;
+          }>;
+        }>;
+        categories: Array<{
+          id: number;
+          name: string;
+        }>;
+      };
+      session: POSConfig['session'];
+    };
+
+    // Only use EventProducts (created via "producto final" toggle in recipes)
+    // Do NOT fall back to cocktails - only show explicitly created products
+    const products: POSProduct[] = (data.catalog?.products || []).map(product => ({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      available: true,
+      category: product.isCombo ? 'Combos' : undefined,
+      glassVolume: product.glassVolume,
+      hasIce: product.hasIce,
+      components: product.components,
+    }));
+
+    // Categories from the catalog
+    const categories: string[] = data.catalog?.categories?.map(c => c.name) || [];
+
+    return {
+      posnet: data.posnet,
+      event: data.event,
+      bar: data.bar,
+      products,
+      categories,
+      session: data.session,
+    };
+  },
+
+  // Open a session
+  openSession: async (posnetId: number, openingCash: number): Promise<POSSession> => {
+    const response = await posApi.post<POSSession>(`/pos/${posnetId}/sessions`, {
+      openingCash,
+    });
+    return response.data;
+  },
+
+  // Close a session
+  closeSession: async (
+    posnetId: number,
+    closingCash: number,
+    notes?: string
+  ): Promise<POSSession> => {
+    const response = await posApi.post<POSSession>(`/pos/${posnetId}/sessions/close`, {
+      closingCash,
+      notes,
+    });
+    return response.data;
+  },
+
+  // Create a sale
+  createSale: async (posnetId: number, dto: CreatePOSSaleDto): Promise<POSSale> => {
+    const response = await posApi.post<POSSale>(`/pos/${posnetId}/sales`, dto);
+    return response.data;
+  },
+
+  // Get sales history
+  getSales: async (posnetId: number): Promise<POSSale[]> => {
+    const response = await posApi.get<POSSale[]>(`/pos/${posnetId}/sales`);
+    return response.data;
+  },
+
+  // Get single sale
+  getSale: async (posnetId: number, saleId: number): Promise<POSSale> => {
+    const response = await posApi.get<POSSale>(`/pos/${posnetId}/sales/${saleId}`);
+    return response.data;
+  },
+
+  // Process refund
+  refundSale: async (
+    posnetId: number,
+    saleId: number,
+    reason: string
+  ): Promise<POSSale> => {
+    const response = await posApi.post<POSSale>(
+      `/pos/${posnetId}/sales/${saleId}/refund`,
+      { reason }
+    );
+    return response.data;
+  },
+
+  // Get receipt data
+  getReceipt: async (posnetId: number, saleId: number): Promise<ReceiptData> => {
+    const response = await posApi.get<ReceiptData>(
+      `/pos/${posnetId}/sales/${saleId}/receipt`
+    );
+    return response.data;
+  },
+
+  // Get receipt HTML
+  getReceiptHtml: async (posnetId: number, saleId: number): Promise<string> => {
+    const response = await posApi.get<string>(
+      `/pos/${posnetId}/sales/${saleId}/receipt/html`
+    );
+    return response.data;
+  },
+
+  // Send heartbeat
+  heartbeat: async (posnetId: number, sessionId?: number): Promise<void> => {
+    await posApi.post(`/pos/${posnetId}/heartbeat`, { sessionId });
+  },
+};
+
+// Reports API
+import type { EventReportData, GenerateReportDto } from './types';
+
+export const reportsApi = {
+  // Get report for an event
+  getReport: async (eventId: number): Promise<EventReportData> => {
+    const response = await api.get<EventReportData>(`/events/${eventId}/report`);
+    return response.data;
+  },
+
+  // Generate or regenerate a report
+  generateReport: async (eventId: number, dto?: GenerateReportDto): Promise<any> => {
+    const response = await api.post(`/events/${eventId}/report/generate`, dto || {});
+    return response.data;
+  },
+
+  // Check if report exists
+  hasReport: async (eventId: number): Promise<boolean> => {
+    try {
+      await api.get(`/events/${eventId}/report`);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  // Generate CSV export
+  generateCSV: async (eventId: number): Promise<{ path: string }> => {
+    const response = await api.post<{ path: string }>(`/events/${eventId}/report/csv`);
+    return response.data;
+  },
+
+  // Download CSV export
+  downloadCSV: async (eventId: number): Promise<Blob> => {
+    const response = await api.get(`/events/${eventId}/report/csv`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  // Generate PDF export
+  generatePDF: async (eventId: number): Promise<{ path: string }> => {
+    const response = await api.post<{ path: string }>(`/events/${eventId}/report/pdf`);
+    return response.data;
+  },
+
+  // Download PDF export
+  downloadPDF: async (eventId: number): Promise<Blob> => {
+    const response = await api.get(`/events/${eventId}/report/pdf`, {
+      responseType: 'blob',
+    });
+    return response.data;
   },
 };

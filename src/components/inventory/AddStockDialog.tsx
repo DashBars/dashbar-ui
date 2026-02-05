@@ -128,7 +128,7 @@ export function AddStockDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto px-1">
             {!isEdit && (
               <>
                 <div className="space-y-2">
@@ -275,7 +275,7 @@ export function AddStockDialog({
               </p>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-6">
             <Button
               type="button"
               variant="outline"

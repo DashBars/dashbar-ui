@@ -23,9 +23,17 @@ import { BarsTable } from '@/components/bars/BarsTable';
 import { BarFormDialog } from '@/components/bars/BarFormDialog';
 import { useBars } from '@/hooks/useBars';
 import type { Event as ApiEvent, EventStatus, Bar, BarType, BarStatus } from '@/lib/api/types';
-import { ChevronRight, Calendar, MapPin, Trash2, Play } from 'lucide-react';
+import { ChevronRight, Calendar, MapPin, Trash2, Play, Cog, Pencil, ArrowLeft } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { EventRecipesTab } from '@/components/events/EventRecipesTab';
 import { EventProductsTab } from '@/components/events/EventProductsTab';
+import { PosManagementTab } from '@/components/pos';
+import { EventReportTab } from '@/components/reports';
 
 // Use persisted status from backend (source of truth)
 function getEventStatus(event: ApiEvent): EventStatus {
@@ -170,13 +178,24 @@ export function EventDetailsPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
-      {/* Breadcrumbs */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
-        <Link to="/events" className="hover:text-foreground">
-          Events
-        </Link>
-        <ChevronRight className="h-4 w-4" />
-        <span className="text-foreground">{event.name}</span>
+      {/* Breadcrumbs with back button */}
+      <div className="flex items-center gap-3 mb-6">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0"
+          onClick={() => navigate('/events')}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span className="sr-only">Volver</span>
+        </Button>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Link to="/events" className="hover:text-foreground">
+            Events
+          </Link>
+          <ChevronRight className="h-4 w-4" />
+          <span className="text-foreground">{event.name}</span>
+        </div>
       </div>
 
       {/* Header */}
@@ -190,30 +209,37 @@ export function EventDetailsPage() {
           </div>
           <StatusBadge status={status} />
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           {status === 'upcoming' && (
-            <>
-              <Button onClick={() => setActivateDialogOpen(true)}>
-                <Play className="mr-2 h-4 w-4" />
-                Activar Evento
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  // Navigate to edit or open edit dialog
-                  // For now, just show a message
-                }}
-              >
-                Editar
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteClick}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Eliminar
-              </Button>
-            </>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="shrink-0">
+                  <Cog className="h-4 w-4" />
+                  <span className="sr-only">Opciones del evento</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[10rem]">
+                <DropdownMenuItem onClick={() => setActivateDialogOpen(true)}>
+                  <Play className="mr-2 h-4 w-4 text-emerald-600" />
+                  Activar evento
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    // TODO: open edit dialog when implemented
+                  }}
+                >
+                  <Pencil className="mr-2 h-4 w-4 text-blue-600" />
+                  Editar
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleDeleteClick}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                  Eliminar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {status === 'active' && (
             <FinishEventButton event={event} />
@@ -236,8 +262,9 @@ export function EventDetailsPage() {
           <TabsTrigger value="bars">Bars</TabsTrigger>
           <TabsTrigger value="prices">Productos</TabsTrigger>
           <TabsTrigger value="recipes">Recetas</TabsTrigger>
-          {status === 'finished' && (
-            <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="pos">POS</TabsTrigger>
+          {(status === 'finished' || status === 'archived') && (
+            <TabsTrigger value="reports">Reportes</TabsTrigger>
           )}
         </TabsList>
 
@@ -330,18 +357,13 @@ export function EventDetailsPage() {
               />
         </TabsContent>
 
-        {status === 'finished' && (
+        <TabsContent value="pos" className="space-y-4">
+          <PosManagementTab eventId={eventIdNum} />
+        </TabsContent>
+
+        {(status === 'finished' || status === 'archived') && (
           <TabsContent value="reports" className="space-y-4">
-            <Card className="rounded-2xl">
-              <CardHeader>
-                <CardTitle className="text-lg">Reports</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground">
-                  Event reports and analytics will be available here.
-                </div>
-              </CardContent>
-            </Card>
+            <EventReportTab eventId={eventIdNum} eventName={event.name} />
           </TabsContent>
         )}
       </Tabs>
