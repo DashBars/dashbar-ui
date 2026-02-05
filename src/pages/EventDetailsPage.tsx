@@ -25,6 +25,7 @@ import { useBars } from '@/hooks/useBars';
 import type { Event as ApiEvent, EventStatus, Bar, BarType, BarStatus } from '@/lib/api/types';
 import { ChevronRight, Calendar, MapPin, Trash2, Play } from 'lucide-react';
 import { EventRecipesTab } from '@/components/events/EventRecipesTab';
+import { EventProductsTab } from '@/components/events/EventProductsTab';
 
 // Use persisted status from backend (source of truth)
 function getEventStatus(event: ApiEvent): EventStatus {
@@ -233,6 +234,7 @@ export function EventDetailsPage() {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="bars">Bars</TabsTrigger>
+          <TabsTrigger value="prices">Productos</TabsTrigger>
           <TabsTrigger value="recipes">Recetas</TabsTrigger>
           {status === 'finished' && (
             <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -292,6 +294,13 @@ export function EventDetailsPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="prices" className="space-y-4">
+          <EventProductsTab
+            eventId={eventIdNum}
+            isEditable={status === 'upcoming' || status === 'active'}
+          />
         </TabsContent>
 
         <TabsContent value="recipes" className="space-y-4">

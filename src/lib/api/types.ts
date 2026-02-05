@@ -144,6 +144,26 @@ export interface Cocktail {
   isCombo: boolean;
 }
 
+// Event/bar prices (event-level barId null, or per-bar override)
+export interface EventPrice {
+  id: number;
+  eventId: number;
+  cocktailId: number;
+  barId: number | null;
+  price: number; // cents
+  cocktail?: Cocktail;
+}
+
+export interface CreatePriceDto {
+  cocktailId: number;
+  price: number; // cents
+  barId?: number; // optional: per-bar override
+}
+
+export interface UpdatePriceDto {
+  price: number; // cents
+}
+
 // Event-level recipes (per bar type)
 export interface EventRecipe {
   id: number;
@@ -468,4 +488,34 @@ export interface TransferToBarDto {
   eventId: number;
   barId: number;
   quantity: number;
+}
+
+// EventProduct types
+export interface EventProduct {
+  id: number;
+  eventId: number;
+  barId: number | null;
+  name: string;
+  price: number; // cents
+  isCombo: boolean;
+  cocktails: EventProductCocktail[];
+}
+
+export interface EventProductCocktail {
+  eventProductId: number;
+  cocktailId: number;
+  cocktail: Cocktail;
+}
+
+export interface CreateProductDto {
+  name: string;
+  price: number; // cents
+  cocktailIds: number[];
+  barId?: number; // optional: per-bar product
+}
+
+export interface UpdateProductDto {
+  name?: string;
+  price?: number; // cents
+  cocktailIds?: number[];
 }

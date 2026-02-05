@@ -44,6 +44,13 @@ import type {
   EventRecipe,
   CreateRecipeDto,
   UpdateRecipeDto,
+  EventPrice,
+  CreatePriceDto,
+  UpdatePriceDto,
+  Cocktail,
+  EventProduct,
+  CreateProductDto,
+  UpdateProductDto,
 } from './types';
 
 // Configure axios base URL - adjust this to match your backend URL
@@ -309,6 +316,100 @@ export const recipesApi = {
       null,
       { params: { from: fromBarType, to: toBarType } },
     );
+    return response.data;
+  },
+};
+
+// Event/bar prices API
+export const pricesApi = {
+  getPrices: async (eventId: number, barId?: number): Promise<EventPrice[]> => {
+    const response = await api.get<EventPrice[]>(`/events/${eventId}/prices`, {
+      params: barId != null ? { barId } : undefined,
+    });
+    return response.data;
+  },
+
+  upsert: async (eventId: number, dto: CreatePriceDto): Promise<EventPrice> => {
+    const response = await api.post<EventPrice>(`/events/${eventId}/prices`, dto);
+    return response.data;
+  },
+
+  bulkUpsert: async (
+    eventId: number,
+    prices: CreatePriceDto[],
+  ): Promise<EventPrice[]> => {
+    const response = await api.post<EventPrice[]>(
+      `/events/${eventId}/prices/bulk`,
+      prices,
+    );
+    return response.data;
+  },
+
+  update: async (
+    eventId: number,
+    priceId: number,
+    dto: UpdatePriceDto,
+  ): Promise<EventPrice> => {
+    const response = await api.put<EventPrice>(
+      `/events/${eventId}/prices/${priceId}`,
+      dto,
+    );
+    return response.data;
+  },
+
+  delete: async (eventId: number, priceId: number): Promise<void> => {
+    await api.delete(`/events/${eventId}/prices/${priceId}`);
+  },
+};
+
+// Products API
+export const productsApi = {
+  getProducts: async (eventId: number, barId?: number): Promise<EventProduct[]> => {
+    const url = barId != null 
+      ? `/events/${eventId}/bars/${barId}/products`
+      : `/events/${eventId}/products`;
+    const response = await api.get<EventProduct[]>(url);
+    return response.data;
+  },
+
+  getProduct: async (eventId: number, productId: number): Promise<EventProduct> => {
+    const response = await api.get<EventProduct>(
+      `/events/${eventId}/products/${productId}`
+    );
+    return response.data;
+  },
+
+  create: async (eventId: number, dto: CreateProductDto): Promise<EventProduct> => {
+    const response = await api.post<EventProduct>(
+      `/events/${eventId}/products`,
+      dto
+    );
+    return response.data;
+  },
+
+  update: async (
+    eventId: number,
+    productId: number,
+    dto: UpdateProductDto
+  ): Promise<EventProduct> => {
+    const response = await api.put<EventProduct>(
+      `/events/${eventId}/products/${productId}`,
+      dto
+    );
+    return response.data;
+  },
+
+  delete: async (eventId: number, productId: number): Promise<void> => {
+    await api.delete(`/events/${eventId}/products/${productId}`);
+  },
+};
+
+// Cocktails API (product catalog for prices)
+export const cocktailsApi = {
+  getCocktails: async (includeInactive = false): Promise<Cocktail[]> => {
+    const response = await api.get<Cocktail[]>('/cocktails', {
+      params: { includeInactive },
+    });
     return response.data;
   },
 };
