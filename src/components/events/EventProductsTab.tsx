@@ -32,7 +32,7 @@ import { useBars } from '@/hooks/useBars';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { EventProduct } from '@/lib/api/types';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Package, Info, GlassWater, Snowflake, Beaker } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package, Info, Snowflake } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useDrinks } from '@/hooks/useDrinks';
 
@@ -151,21 +151,11 @@ export function EventProductsTab({ eventId, isEditable }: EventProductsTabProps)
     }
   };
 
-  const getCocktailNames = (product: EventProduct) => {
-    return product.cocktails.map((c) => c.cocktail.name).join(' + ');
-  };
-
   // Get recipe details for a product
   const getRecipeForProduct = (productName: string) => {
     return recipes.find(
       (r) => r.cocktailName.toLowerCase() === productName.toLowerCase()
     );
-  };
-
-  // Get drink name by ID
-  const getDrinkName = (drinkId: number) => {
-    const drink = drinks.find((d) => d.id === drinkId);
-    return drink ? drink.name : `#${drinkId}`;
   };
 
   const barTypeLabels: Record<string, string> = {
@@ -301,9 +291,8 @@ export function EventProductsTab({ eventId, isEditable }: EventProductsTabProps)
         ) : (
           <div className="space-y-4">
             {groupedProducts.map((group) => {
-              const { displayName, alternateNames, products: groupProducts, recipes: groupRecipes, componentDrinkIds } = group;
+              const { displayName, alternateNames, products: groupProducts, componentDrinkIds } = group;
               const hasMultipleNames = alternateNames.length > 1;
-              const hasRecipe = groupRecipes.length > 0;
               
               return (
                 <div key={displayName} className="rounded-xl border bg-card overflow-hidden">

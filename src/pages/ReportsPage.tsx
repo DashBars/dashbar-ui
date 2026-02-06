@@ -478,8 +478,8 @@ function ComparisonResults({
                 <XAxis dataKey="eventName" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={(v) => formatCurrency(v)} tick={{ fontSize: 11 }} />
                 <Tooltip
-                  formatter={(value: number, name: string) => [
-                    formatCurrency(value),
+                  formatter={(value, name) => [
+                    formatCurrency(value as number),
                     name === 'totalRevenue' ? 'Ingresos' : name === 'totalCOGS' ? 'COGS' : 'Ganancia',
                   ]}
                 />
@@ -656,9 +656,9 @@ function TimeSeriesOverlayChart({ data }: { data: EventComparisonReport }) {
             tick={{ fontSize: 11 }}
           />
           <Tooltip
-            formatter={(value: number, name: string) => [
-              `$${value.toLocaleString('es-AR', { minimumFractionDigits: 0 })}`,
-              name,
+            formatter={(value, name) => [
+              `$${(value as number).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`,
+              name as string,
             ]}
             labelFormatter={(label) => `Hora ${label} desde inicio`}
           />

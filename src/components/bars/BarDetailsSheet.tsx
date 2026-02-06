@@ -140,7 +140,7 @@ export function BarDetailsSheet({
               <RecipeOverridesTab eventId={eventId} barId={displayBar.id} />
             </TabsContent>
             <TabsContent value="pos" className="mt-4">
-              <PosnetsTab posnets={displayBar.posnets || []} />
+              <PosnetsTab posnets={displayBar.posnets || []} eventId={eventId} barId={displayBar.id} />
             </TabsContent>
           </Tabs>
         )}

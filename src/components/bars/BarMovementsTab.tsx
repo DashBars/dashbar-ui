@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, ShoppingCart, Wrench, Undo2, Package, Beaker } from 'lucide-react';
-import type { InventoryMovement, StockMovementReason } from '@/lib/api/types';
+import type { InventoryMovement } from '@/lib/api/types';
 
 interface BarMovementsTabProps {
   eventId: number;

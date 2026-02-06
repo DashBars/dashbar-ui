@@ -15,7 +15,7 @@ import { useDrinks } from '@/hooks/useDrinks';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { BarType, EventRecipe } from '@/lib/api/types';
 import { toast } from 'sonner';
-import { X, Plus, ChevronsUpDown, Check, GlassWater, Thermometer, DollarSign, Beaker, Snowflake, Info } from 'lucide-react';
+import { X, Plus, ChevronsUpDown, Check, GlassWater, Snowflake, Info } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 interface EventRecipesTabProps {
@@ -71,7 +71,7 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
   };
 
   // Get a canonical name for a group of recipes based on their components
-  const getCanonicalName = (recipeNames: string[], componentDrinkIds: number[]): string => {
+  const getCanonicalName = (recipeNames: string[], _componentDrinkIds: number[]): string => {
     // If all recipes have the same name, use it
     const uniqueNames = [...new Set(recipeNames.map(n => n.toLowerCase().trim()))];
     if (uniqueNames.length === 1) {
@@ -133,11 +133,6 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
       };
     });
   }, [recipes]);
-
-  const getDrinkLabel = (id: number) => {
-    const drink = drinks.find((d) => d.id === id);
-    return drink ? `${drink.name} - ${drink.brand}` : `Drink ${id}`;
-  };
 
   const formatPrice = (cents: number) => {
     return `$${(cents / 100).toFixed(2)}`;
@@ -356,7 +351,7 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
                             <span>También conocido como:</span>
                             {alternateNames
                               .filter(n => n !== displayName)
-                              .map((name, i) => (
+                              .map((name) => (
                                 <Badge key={name} variant="outline" className="text-xs font-normal">
                                   {name}
                                 </Badge>
