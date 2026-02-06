@@ -31,6 +31,8 @@ const barTypeLabels: Record<BarType, string> = {
   lounge: 'Lounge',
 };
 
+const ALL_BAR_TYPES: BarType[] = ['VIP', 'general', 'backstage', 'lounge'];
+
 export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
   const { data: recipes = [], isLoading } = useEventRecipes(eventId);
   const { data: drinks = [], isLoading: isLoadingDrinks } = useDrinks();
@@ -50,6 +52,7 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
   const [hasIce, setHasIce] = useState(false);
   const [selectedBarTypes, setSelectedBarTypes] = useState<BarType[]>([]);
   const [components, setComponents] = useState<Array<{ drinkId: string; percentage: string }>>([]);
+  const [disabledBarTypes, setDisabledBarTypes] = useState<BarType[]>([]);
 
   const updateRecipe = useUpdateRecipe(eventId, editingRecipe?.id || 0);
 
@@ -116,12 +119,21 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
       }
     });
     
-    return Array.from(groups.values()).map(g => ({
-      displayName: g.displayName,
-      alternateNames: g.alternateNames,
-      recipes: g.recipes,
-      hasMultipleNames: g.alternateNames.length > 1
-    }));
+    return Array.from(groups.values()).map(g => {
+      // Calculate covered bar types across all variants
+      const coveredBarTypes = new Set<BarType>();
+      g.recipes.forEach(r => r.barTypes.forEach(bt => coveredBarTypes.add(bt)));
+      const allBarTypesCovered = ALL_BAR_TYPES.every(bt => coveredBarTypes.has(bt));
+      
+      return {
+        displayName: g.displayName,
+        alternateNames: g.alternateNames,
+        recipes: g.recipes,
+        hasMultipleNames: g.alternateNames.length > 1,
+        coveredBarTypes: Array.from(coveredBarTypes),
+        allBarTypesCovered,
+      };
+    });
   }, [recipes]);
 
   const getDrinkLabel = (id: number) => {
@@ -149,6 +161,12 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
           percentage: c.percentage.toString(),
         })),
       );
+      // When editing, disable bar types used by OTHER variants of the same cocktail
+      const otherVariantsBarTypes = new Set<BarType>();
+      recipes
+        .filter(r => r.cocktailName === recipe.cocktailName && r.id !== recipe.id)
+        .forEach(r => r.barTypes.forEach(bt => otherVariantsBarTypes.add(bt)));
+      setDisabledBarTypes(Array.from(otherVariantsBarTypes));
     } else {
       setEditingRecipe(null);
       setCocktailName('');
@@ -158,6 +176,7 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
       setHasIce(false);
       setSelectedBarTypes([]);
       setComponents([]);
+      setDisabledBarTypes([]); // No disabled bar types for new cocktail
     }
     setDialogOpen(true);
   };
@@ -315,7 +334,7 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
           ) : (
             <div className="space-y-4">
               {groupedRecipes.map((group) => {
-                const { displayName, alternateNames, recipes: variants, hasMultipleNames } = group;
+                const { displayName, alternateNames, recipes: variants, hasMultipleNames, allBarTypesCovered } = group;
                 
                 // Get all unique components across all variants
                 const allDrinkIds = new Set<number>();
@@ -348,35 +367,47 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
                         )}
                       </div>
                       {isEditable && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            // Pre-fill with cocktail name for new variant
-                            setEditingRecipe(null);
-                            setCocktailName(displayName);
-                            setGlassVolume('');
-                            setIsFinalProduct(true);
-                            setSalePrice('');
-                            setHasIce(variants[0]?.hasIce || false);
-                            setSelectedBarTypes([]);
-                            // Copy components from first variant as template
-                            if (variants[0]) {
-                              setComponents(
-                                variants[0].components.map((c) => ({
-                                  drinkId: c.drinkId.toString(),
-                                  percentage: c.percentage.toString(),
-                                }))
-                              );
-                            } else {
-                              setComponents([]);
-                            }
-                            setDialogOpen(true);
-                          }}
-                        >
-                          <Plus className="h-3.5 w-3.5 mr-1" />
-                          Nueva variante
-                        </Button>
+                        allBarTypesCovered ? (
+                          <Badge variant="secondary" className="text-xs font-normal">
+                            <Check className="h-3 w-3 mr-1" />
+                            Todos los tipos de barra configurados
+                          </Badge>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              // Pre-fill with cocktail name for new variant
+                              setEditingRecipe(null);
+                              setCocktailName(displayName);
+                              setGlassVolume('');
+                              setIsFinalProduct(true);
+                              // Pre-fill price from first variant for auto-merge to work
+                              setSalePrice(variants[0]?.salePrice ? (variants[0].salePrice / 100).toString() : '');
+                              setHasIce(variants[0]?.hasIce || false);
+                              setSelectedBarTypes([]);
+                              // Disable bar types already used by other variants
+                              const usedBarTypes = new Set<BarType>();
+                              variants.forEach(v => v.barTypes.forEach(bt => usedBarTypes.add(bt)));
+                              setDisabledBarTypes(Array.from(usedBarTypes));
+                              // Copy components from first variant as template
+                              if (variants[0]) {
+                                setComponents(
+                                  variants[0].components.map((c) => ({
+                                    drinkId: c.drinkId.toString(),
+                                    percentage: c.percentage.toString(),
+                                  }))
+                                );
+                              } else {
+                                setComponents([]);
+                              }
+                              setDialogOpen(true);
+                            }}
+                          >
+                            <Plus className="h-3.5 w-3.5 mr-1" />
+                            Nueva variante
+                          </Button>
+                        )
                       )}
                     </div>
                     
@@ -683,20 +714,30 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
                   <div className="grid gap-2">
                     <Label>Tipos de barra</Label>
                     <div className="flex flex-wrap gap-2">
-                      {(['VIP', 'general', 'backstage', 'lounge'] as BarType[]).map((barType) => (
-                        <Button
-                          key={barType}
-                          type="button"
-                          variant={selectedBarTypes.includes(barType) ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => handleBarTypeToggle(barType)}
-                        >
-                          {barTypeLabels[barType]}
-                        </Button>
-                      ))}
+                      {(['VIP', 'general', 'backstage', 'lounge'] as BarType[]).map((barType) => {
+                        const isDisabled = disabledBarTypes.includes(barType);
+                        return (
+                          <Button
+                            key={barType}
+                            type="button"
+                            variant={selectedBarTypes.includes(barType) ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => handleBarTypeToggle(barType)}
+                            disabled={isDisabled}
+                            title={isDisabled ? 'Ya existe una variante para este tipo de barra' : undefined}
+                          >
+                            {barTypeLabels[barType]}
+                          </Button>
+                        );
+                      })}
                     </div>
                     {selectedBarTypes.length === 0 && (
                       <p className="text-xs text-destructive">Selecciona al menos un tipo de barra</p>
+                    )}
+                    {disabledBarTypes.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Los tipos de barra deshabilitados ya tienen una variante configurada
+                      </p>
                     )}
                   </div>
                 </>
