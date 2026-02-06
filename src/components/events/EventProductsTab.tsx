@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
   useEventProducts, 
@@ -250,24 +251,17 @@ export function EventProductsTab({ eventId, isEditable }: EventProductsTabProps)
             </Button>
           )}
         </div>
-        <div className="flex gap-4 mt-4">
-          <div className="flex gap-2">
-            <Button
-              variant={scope === 'event' ? 'default' : 'outline'}
-              onClick={() => {
-                setScope('event');
-                setSelectedBarId(null);
-              }}
-            >
-              Productos del Evento
-            </Button>
-            <Button
-              variant={scope === 'bar' ? 'default' : 'outline'}
-              onClick={() => setScope('bar')}
-            >
-              Productos por Barra
-            </Button>
-          </div>
+        <div className="flex items-center gap-4 mt-4">
+          <Tabs value={scope} onValueChange={(v) => {
+            const newScope = v as 'event' | 'bar';
+            setScope(newScope);
+            if (newScope === 'event') setSelectedBarId(null);
+          }}>
+            <TabsList>
+              <TabsTrigger value="event">Productos del Evento</TabsTrigger>
+              <TabsTrigger value="bar">Productos por Barra</TabsTrigger>
+            </TabsList>
+          </Tabs>
           {scope === 'bar' && (
             <Select
               value={selectedBarId?.toString() ?? ''}

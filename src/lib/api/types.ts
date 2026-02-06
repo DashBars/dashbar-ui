@@ -863,3 +863,112 @@ export interface EventReportData {
 export interface GenerateReportDto {
   bucketSize?: BucketSize;
 }
+
+// ============= COMPARISON TYPES =============
+
+export interface EligibleEventForComparison {
+  eventId: number;
+  eventName: string;
+  startedAt: string;
+  finishedAt: string;
+  durationHours: number;
+  hasReport: boolean;
+}
+
+export interface EventComparisonRow {
+  eventId: number;
+  eventName: string;
+  startedAt: string;
+  finishedAt: string;
+  durationHours: number;
+  // Totals
+  totalRevenue: number;
+  totalCOGS: number;
+  grossProfit: number;
+  marginPercent: number;
+  totalUnitsSold: number;
+  totalOrderCount: number;
+  // Normalized per hour
+  revenuePerHour: number;
+  cogsPerHour: number;
+  unitsPerHour: number;
+  ordersPerHour: number;
+}
+
+export interface CrossEventProductByEvent {
+  eventId: number;
+  eventName: string;
+  unitsSold: number;
+  revenue: number;
+  sharePercent: number;
+  rank: number;
+}
+
+export interface CrossEventProduct {
+  cocktailId: number;
+  name: string;
+  eventsAppeared: number;
+  totalUnitsAcrossEvents: number;
+  totalRevenueAcrossEvents: number;
+  avgSharePercent: number;
+  byEvent: CrossEventProductByEvent[];
+}
+
+export interface PeakTimePatternEvent {
+  eventId: number;
+  eventName: string;
+  units: number;
+  revenue: number;
+}
+
+export interface PeakTimePattern {
+  hourOfDay: number;
+  eventsWithPeak: number;
+  eventDetails: PeakTimePatternEvent[];
+}
+
+export type InsightType =
+  | 'consistent_top_product'
+  | 'peak_time_pattern'
+  | 'margin_outlier'
+  | 'volume_outlier';
+
+export interface ComparisonInsight {
+  type: InsightType;
+  message: string;
+  data: Record<string, any>;
+}
+
+export interface EventTimeSeries {
+  eventId: number;
+  eventName: string;
+  series: TimeSeriesEntry[];
+}
+
+export interface EventComparisonReport {
+  generatedAt: string;
+  eventIds: number[];
+  eventComparison: EventComparisonRow[];
+  crossEventProducts: CrossEventProduct[];
+  peakTimePatterns: PeakTimePattern[];
+  timeSeriesByEvent: EventTimeSeries[];
+  insights: ComparisonInsight[];
+}
+
+// Report list item (from GET /reports)
+export interface EventReportListItem {
+  id: number;
+  eventId: number;
+  generatedAt: string;
+  totalRevenue: number;
+  totalCOGS: number;
+  grossProfit: number;
+  totalUnitsSold: number;
+  totalOrderCount: number;
+  event: {
+    id: number;
+    name: string;
+    startedAt: string | null;
+    finishedAt: string | null;
+  };
+}

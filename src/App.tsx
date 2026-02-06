@@ -11,6 +11,7 @@ import { VenuesPage } from './pages/VenuesPage';
 import { BarInventoryPage } from './pages/BarInventoryPage';
 import { BarManagementPage } from './pages/BarManagementPage';
 import { BarTabRedirect } from './pages/BarTabRedirect';
+import { ReportsPage } from './pages/ReportsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { POSLoginPage, POSKioskPage, POSReceiptPage } from './pages/pos';
 import { AppShell } from './components/layout/AppShell';
@@ -55,6 +56,7 @@ function App() {
             >
               <Route path="/suppliers" element={<SuppliersAndInventoryPage />} />
               <Route path="/venues" element={<VenuesPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
               <Route path="/events" element={<EventsListPage />} />
               <Route path="/events/:eventId" element={<EventDetailsPage />} />
               <Route path="/events/:eventId/bars/:barId" element={<BarManagementPage />} />

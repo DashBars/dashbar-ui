@@ -12,7 +12,6 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useEventRecipes, useCreateRecipe, useDeleteRecipe, useUpdateRecipe } from '@/hooks/useRecipes';
 import { useDrinks } from '@/hooks/useDrinks';
-import { useCocktails } from '@/hooks/useCocktails';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { BarType, EventRecipe } from '@/lib/api/types';
 import { toast } from 'sonner';
@@ -36,7 +35,7 @@ const ALL_BAR_TYPES: BarType[] = ['VIP', 'general', 'backstage', 'lounge'];
 export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
   const { data: recipes = [], isLoading } = useEventRecipes(eventId);
   const { data: drinks = [], isLoading: isLoadingDrinks } = useDrinks();
-  const { data: allCocktails = [] } = useCocktails(false);
+  // Removed global cocktails - only use recipe names from current event
   const createRecipe = useCreateRecipe(eventId);
   const deleteRecipe = useDeleteRecipe(eventId);
 
@@ -56,13 +55,12 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
 
   const updateRecipe = useUpdateRecipe(eventId, editingRecipe?.id || 0);
 
-  // Get unique cocktail names from existing recipes and cocktails
+  // Get unique cocktail names from existing recipes in this event only
   const existingCocktailNames = useMemo(() => {
     const names = new Set<string>();
     recipes.forEach(r => names.add(r.cocktailName));
-    allCocktails.forEach(c => names.add(c.name));
     return Array.from(names).sort();
-  }, [recipes, allCocktails]);
+  }, [recipes]);
 
   // Generate a component signature for a recipe (sorted drink IDs)
   const getComponentSignature = (recipe: EventRecipe): string => {

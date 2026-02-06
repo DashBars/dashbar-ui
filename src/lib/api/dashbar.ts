@@ -903,9 +903,21 @@ export const posDeviceApi = {
 };
 
 // Reports API
-import type { EventReportData, GenerateReportDto } from './types';
+import type {
+  EventReportData,
+  GenerateReportDto,
+  EventReportListItem,
+  EligibleEventForComparison,
+  EventComparisonReport,
+} from './types';
 
 export const reportsApi = {
+  // Get all reports for the authenticated user
+  getAllReports: async (): Promise<EventReportListItem[]> => {
+    const response = await api.get<EventReportListItem[]>('/reports');
+    return response.data;
+  },
+
   // Get report for an event
   getReport: async (eventId: number): Promise<EventReportData> => {
     const response = await api.get<EventReportData>(`/events/${eventId}/report`);
@@ -953,6 +965,18 @@ export const reportsApi = {
     const response = await api.get(`/events/${eventId}/report/pdf`, {
       responseType: 'blob',
     });
+    return response.data;
+  },
+
+  // Get events eligible for comparison
+  getEligibleForComparison: async (): Promise<EligibleEventForComparison[]> => {
+    const response = await api.get<EligibleEventForComparison[]>('/reports/comparison/eligible');
+    return response.data;
+  },
+
+  // Generate comparison report for multiple events
+  generateComparison: async (eventIds: number[]): Promise<EventComparisonReport> => {
+    const response = await api.post<EventComparisonReport>('/reports/comparison', { eventIds });
     return response.data;
   },
 };
