@@ -47,8 +47,21 @@ export interface StockSummary {
   drinkId: number;
   drinkName: string;
   drinkBrand: string;
-  totalQuantity: number;
+  drinkVolume: number;    // ml per unit (bottle/can size)
+  totalQuantity: number;  // total ml in stock
+  unitCount: number;      // equivalent whole units (bottles/cans)
   supplierCount: number;
+}
+
+/** Unique drink available in a bar's stock (aggregated across suppliers) */
+export interface BarStockDrink {
+  drinkId: number;
+  name: string;
+  brand: string;
+  volume: number;     // ml per unit (bottle/can size)
+  totalMl: number;    // total ml available
+  unitCount: number;  // equivalent whole units
+  costPerMl?: number; // weighted average cost in cents per ml (only from drinks-by-type endpoint)
 }
 
 export interface UpsertStockDto {
@@ -71,6 +84,12 @@ export interface Drink {
   sku: string;
   drinkType: 'alcoholic' | 'non_alcoholic';
   volume: number;
+  _count?: {
+    globalInventories: number;
+    stocks: number;
+    eventRecipeComponents: number;
+    inventoryMovements: number;
+  };
 }
 
 export interface CreateDrinkDto {
@@ -208,7 +227,7 @@ export interface UpdateRecipeDto {
 // Posnet types (POS Terminal)
 export type PosnetStatus = 'OPEN' | 'CONGESTED' | 'CLOSED';
 export type POSSaleStatus = 'PENDING' | 'COMPLETED' | 'REFUNDED' | 'VOIDED';
-export type POSPaymentMethod = 'cash' | 'card' | 'digital';
+export type POSPaymentMethod = 'credit' | 'debit' | 'cash' | 'bankTransfer' | 'wallet';
 
 export interface Posnet {
   id: number;
@@ -318,6 +337,8 @@ export interface POSProduct {
   available: boolean;
   stockLevel?: number;
   imageUrl?: string;
+  // Cocktail ID linked to this product (needed for POS sales)
+  cocktailId?: number;
   // Recipe details
   glassVolume?: number;
   hasIce?: boolean;
@@ -331,9 +352,8 @@ export interface CartItem {
 
 export interface CreatePOSSaleDto {
   items: Array<{
-    productId: number;
+    cocktailId: number;
     quantity: number;
-    unitPrice: number;
   }>;
   paymentMethod: POSPaymentMethod;
   paymentAmount?: number;
@@ -451,6 +471,7 @@ export interface InventoryMovement {
   createdAt: string;
   drink?: Drink;
   supplier?: Supplier;
+  bar?: { id: number; name: string };
 }
 
 // Event types
@@ -636,6 +657,21 @@ export interface ReturnStockDto {
   sellAsWholeUnit: boolean;
   quantity: number;
   notes?: string;
+}
+
+export type BulkReturnMode = 'to_global' | 'to_supplier' | 'auto';
+
+export interface BulkReturnStockDto {
+  items: ReturnStockDto[];
+  mode: BulkReturnMode;
+  notes?: string;
+}
+
+export interface BulkReturnResult {
+  processed: number;
+  toGlobal: number;
+  toSupplier: number;
+  errors: string[];
 }
 
 export interface CreateManagerInventoryDto {
@@ -971,4 +1007,113 @@ export interface EventReportListItem {
     startedAt: string | null;
     finishedAt: string | null;
   };
+}
+
+// ── Dashboard / Monitoring types ──
+
+export interface DashboardTotals {
+  sales: {
+    totalAmount: number;
+    totalUnits: number;
+    orderCount: number;
+  };
+  consumption: {
+    totalMl: number;
+    byDrink: Array<{
+      drinkId: number;
+      name: string;
+      totalMl: number;
+    }>;
+  };
+}
+
+export interface TimeSeriesPoint {
+  timestamp: string;
+  units: number;
+  amount: number;
+}
+
+export interface TimeSeriesResponse {
+  bucketSize: string;
+  series: TimeSeriesPoint[];
+}
+
+export interface TopProduct {
+  cocktailId: number;
+  name: string;
+  units: number;
+  amount: number;
+}
+
+export interface TopProductsResponse {
+  products: TopProduct[];
+}
+
+// WebSocket event payloads
+
+export interface WsSaleCreatedPayload {
+  type: 'sale:created';
+  eventId: number;
+  barId: number;
+  data: {
+    saleId: number;
+    cocktailId: number;
+    cocktailName: string;
+    quantity: number;
+    totalAmount: number;
+    createdAt: string;
+  };
+}
+
+export interface WsConsumptionUpdatedPayload {
+  type: 'consumption:updated';
+  eventId: number;
+  barId: number;
+  data: {
+    saleId: number;
+    depletions: Array<{
+      drinkId: number;
+      drinkName: string;
+      supplierId: number;
+      quantityDeducted: number;
+    }>;
+  };
+}
+
+export interface WsPosStateUpdatePayload {
+  posnetId: number;
+  state: PosnetStatus;
+  reason?: string;
+}
+
+export interface WsPosMetricsUpdatePayload {
+  posnetId: number;
+  metrics: {
+    traffic: number;
+    status: PosnetStatus;
+  };
+}
+
+export interface WsPosSalePayload {
+  posnetId: number;
+  eventId: number;
+  barId: number;
+  sale: {
+    id: number;
+    total: number;
+    itemCount: number;
+    productName?: string;
+  };
+}
+
+export interface WsAlertPayload {
+  id: number;
+  eventId: number;
+  barId: number;
+  drinkId: number;
+  drinkName?: string;
+  barName?: string;
+  type: string;
+  message: string;
+  createdAt: string;
 }

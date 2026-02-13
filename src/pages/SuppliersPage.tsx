@@ -50,14 +50,14 @@ export function SuppliersPage() {
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Suppliers</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Proveedores</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your suppliers and their contact information
+            Gestioná tus proveedores y su información de contacto
           </p>
         </div>
         <Button onClick={handleCreate}>
           <Plus className="mr-2 h-4 w-4" />
-          New supplier
+          Nuevo proveedor
         </Button>
       </div>
 
@@ -65,15 +65,14 @@ export function SuppliersPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <p className="text-lg font-medium text-muted-foreground mb-4">
-              No suppliers yet
+              Todavía no hay proveedores
             </p>
             <p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
-              Get started by adding your first supplier. You'll be able to link stock
-              receipts to suppliers and track consignment returns.
+              Empezá agregando tu primer proveedor. Vas a poder vincular compras de stock y hacer seguimiento de consignaciones.
             </p>
             <Button onClick={handleCreate}>
               <Plus className="mr-2 h-4 w-4" />
-              Add your first supplier
+              Agregá tu primer proveedor
             </Button>
           </CardContent>
         </Card>
@@ -95,10 +94,9 @@ export function SuppliersPage() {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Supplier</DialogTitle>
+            <DialogTitle>Eliminar Proveedor</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{supplierToDelete?.name}"? This action
-              cannot be undone.
+              ¿Estás seguro de que querés eliminar "{supplierToDelete?.name}"? Esta acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -106,10 +104,10 @@ export function SuppliersPage() {
               variant="outline"
               onClick={() => setDeleteDialogOpen(false)}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button variant="destructive" onClick={handleDeleteConfirm}>
-              Delete
+              Eliminar
             </Button>
           </DialogFooter>
         </DialogContent>

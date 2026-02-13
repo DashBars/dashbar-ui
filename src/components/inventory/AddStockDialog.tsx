@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -52,34 +52,86 @@ export function AddStockDialog({
   const { data: suppliers = [], isLoading: isLoadingSuppliers } = useSuppliers();
 
   const [drinkId, setDrinkId] = useState<string>('');
+  const [drinkSearch, setDrinkSearch] = useState('');
+  const [showDrinkSuggestions, setShowDrinkSuggestions] = useState(false);
+  const drinkInputRef = useRef<HTMLInputElement>(null);
+  const drinkSuggestionsRef = useRef<HTMLDivElement>(null);
+
   const [supplierId, setSupplierId] = useState<string>('none');
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [showSupplierSuggestions, setShowSupplierSuggestions] = useState(false);
+  const supplierInputRef = useRef<HTMLInputElement>(null);
+  const supplierSuggestionsRef = useRef<HTMLDivElement>(null);
+
   const [totalQuantity, setTotalQuantity] = useState<string>('');
   const [unitCost, setUnitCost] = useState<string>('');
   const [currency, setCurrency] = useState<string>('ARS');
   const [sku, setSku] = useState<string>('');
   const [ownershipMode, setOwnershipMode] = useState<OwnershipMode>('purchased');
 
+  const filteredDrinks = useMemo(() => {
+    if (!drinkSearch.trim()) return drinks.slice(0, 10);
+    const q = drinkSearch.toLowerCase();
+    return drinks.filter(
+      (d) => d.name.toLowerCase().includes(q) || d.brand.toLowerCase().includes(q) || d.sku.toLowerCase().includes(q),
+    ).slice(0, 10);
+  }, [drinkSearch, drinks]);
+
+  const filteredSuppliers = useMemo(() => {
+    if (!supplierSearch.trim()) return suppliers;
+    const q = supplierSearch.toLowerCase();
+    return suppliers.filter((s) => s.name.toLowerCase().includes(q));
+  }, [supplierSearch, suppliers]);
+
   useEffect(() => {
     if (open) {
       if (isEdit && inventory) {
         setDrinkId(inventory.drinkId.toString());
+        const existingDrink = drinks.find((d) => d.id === inventory.drinkId);
+        setDrinkSearch(existingDrink ? `${existingDrink.name} - ${existingDrink.brand} (${existingDrink.volume}ml)` : '');
         setSupplierId(inventory.supplierId ? inventory.supplierId.toString() : 'none');
+        const existingSupplier = suppliers.find((s) => s.id === inventory.supplierId);
+        setSupplierSearch(existingSupplier ? existingSupplier.name : '');
         setTotalQuantity(inventory.totalQuantity.toString());
-        setUnitCost((inventory.unitCost / 100).toFixed(2)); // Convertir de centavos a unidades
+        setUnitCost((inventory.unitCost / 100).toFixed(2));
         setCurrency(inventory.currency || 'ARS');
         setSku(inventory.sku || '');
         setOwnershipMode(inventory.ownershipMode);
       } else {
         setDrinkId('');
+        setDrinkSearch('');
         setSupplierId('none');
+        setSupplierSearch('');
         setTotalQuantity('');
         setUnitCost('');
         setCurrency('ARS');
         setSku('');
         setOwnershipMode('purchased');
       }
+      setShowDrinkSuggestions(false);
+      setShowSupplierSuggestions(false);
     }
-  }, [open, inventory, isEdit]);
+  }, [open, inventory, isEdit, drinks, suppliers]);
+
+  // Close suggestions on click outside
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (
+        drinkSuggestionsRef.current && !drinkSuggestionsRef.current.contains(e.target as Node) &&
+        drinkInputRef.current && !drinkInputRef.current.contains(e.target as Node)
+      ) {
+        setShowDrinkSuggestions(false);
+      }
+      if (
+        supplierSuggestionsRef.current && !supplierSuggestionsRef.current.contains(e.target as Node) &&
+        supplierInputRef.current && !supplierInputRef.current.contains(e.target as Node)
+      ) {
+        setShowSupplierSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -131,51 +183,108 @@ export function AddStockDialog({
           <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto px-1">
             {!isEdit && (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="drinkId">
+                <div className="space-y-2 relative">
+                  <Label htmlFor="drinkSearch">
                     Insumo <span className="text-destructive">*</span>
                   </Label>
-                  <Select
-                    value={drinkId}
-                    onValueChange={setDrinkId}
+                  <Input
+                    ref={drinkInputRef}
+                    id="drinkSearch"
+                    value={drinkSearch}
+                    onChange={(e) => {
+                      setDrinkSearch(e.target.value);
+                      setDrinkId('');
+                      setShowDrinkSuggestions(true);
+                    }}
+                    onFocus={() => setShowDrinkSuggestions(true)}
+                    placeholder="Buscar insumo por nombre, marca o SKU..."
+                    autoComplete="off"
                     disabled={isSubmitting || isLoadingDrinks}
-                  >
-                    <SelectTrigger id="drinkId">
-                      <SelectValue placeholder="Seleccionar insumo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {drinks.map((drink) => (
-                        <SelectItem key={drink.id} value={drink.id.toString()}>
-                          {drink.name} - {drink.brand} ({drink.volume}ml)
-                        </SelectItem>
+                  />
+                  {showDrinkSuggestions && filteredDrinks.length > 0 && (
+                    <div
+                      ref={drinkSuggestionsRef}
+                      className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border bg-popover shadow-md max-h-52 overflow-y-auto"
+                    >
+                      {filteredDrinks.map((d) => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 hover:bg-accent transition-colors flex items-center justify-between gap-2 text-sm ${drinkId === d.id.toString() ? 'bg-accent' : ''}`}
+                          onClick={() => {
+                            setDrinkId(d.id.toString());
+                            setDrinkSearch(`${d.name} - ${d.brand} (${d.volume}ml)`);
+                            setShowDrinkSuggestions(false);
+                          }}
+                        >
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-medium truncate">{d.name}</span>
+                            <span className="text-xs text-muted-foreground truncate">{d.brand} | SKU: {d.sku}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 text-xs text-muted-foreground">
+                            <span>{d.volume}ml</span>
+                            <span className="rounded bg-muted px-1.5 py-0.5">
+                              {d.drinkType === 'alcoholic' ? 'Alc' : 'S/A'}
+                            </span>
+                          </div>
+                        </button>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  )}
                   {selectedDrink && (
                     <p className="text-xs text-muted-foreground">
                       Marca: {selectedDrink.brand} | Volumen: {selectedDrink.volume}ml | SKU: {selectedDrink.sku}
                     </p>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="supplierId">Proveedor</Label>
-                  <Select
-                    value={supplierId}
-                    onValueChange={setSupplierId}
+                <div className="space-y-2 relative">
+                  <Label htmlFor="supplierSearch">Proveedor</Label>
+                  <Input
+                    ref={supplierInputRef}
+                    id="supplierSearch"
+                    value={supplierSearch}
+                    onChange={(e) => {
+                      setSupplierSearch(e.target.value);
+                      setSupplierId('none');
+                      setShowSupplierSuggestions(true);
+                    }}
+                    onFocus={() => setShowSupplierSuggestions(true)}
+                    placeholder="Buscar proveedor..."
+                    autoComplete="off"
                     disabled={isSubmitting || isLoadingSuppliers}
-                  >
-                    <SelectTrigger id="supplierId">
-                      <SelectValue placeholder="Seleccionar proveedor (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin proveedor</SelectItem>
-                      {suppliers.map((supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                          {supplier.name}
-                        </SelectItem>
+                  />
+                  {showSupplierSuggestions && (
+                    <div
+                      ref={supplierSuggestionsRef}
+                      className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border bg-popover shadow-md max-h-44 overflow-y-auto"
+                    >
+                      <button
+                        type="button"
+                        className={`w-full text-left px-3 py-2 hover:bg-accent transition-colors text-sm text-muted-foreground ${supplierId === 'none' && !supplierSearch.trim() ? 'bg-accent' : ''}`}
+                        onClick={() => {
+                          setSupplierId('none');
+                          setSupplierSearch('');
+                          setShowSupplierSuggestions(false);
+                        }}
+                      >
+                        Sin proveedor
+                      </button>
+                      {filteredSuppliers.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 hover:bg-accent transition-colors text-sm ${supplierId === s.id.toString() ? 'bg-accent' : ''}`}
+                          onClick={() => {
+                            setSupplierId(s.id.toString());
+                            setSupplierSearch(s.name);
+                            setShowSupplierSuggestions(false);
+                          }}
+                        >
+                          {s.name}
+                        </button>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     Opcional. Puedes agregar stock sin asociarlo a un proveedor.
                   </p>

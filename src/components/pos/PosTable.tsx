@@ -30,13 +30,13 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
-  Key,
   Copy,
   ExternalLink,
   Activity,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useDeletePosnet, useRotatePosnetToken } from '@/hooks/usePosnets';
+import { useDeletePosnet } from '@/hooks/usePosnets';
+import { posDeviceApi } from '@/lib/api/dashbar';
 import type { Posnet, PosnetStatus } from '@/lib/api/types';
 
 interface PosTableProps {
@@ -67,23 +67,21 @@ function StatusBadge({ status }: { status: PosnetStatus }) {
 }
 
 function formatRelativeTime(dateString?: string) {
-  if (!dateString) return 'Never';
+  if (!dateString) return 'Nunca';
   const date = new Date(dateString);
   const now = new Date();
   const diffSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffSeconds < 60) return `${diffSeconds}s ago`;
-  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m ago`;
-  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h ago`;
+  if (diffSeconds < 60) return `${diffSeconds}s atrás`;
+  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m atrás`;
+  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h atrás`;
   return date.toLocaleDateString();
 }
 
 export function PosTable({ posnets, eventId, onEdit }: PosTableProps) {
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [rotateTokenId, setRotateTokenId] = useState<number | null>(null);
 
   const deletePosnet = useDeletePosnet(eventId);
-  const rotateToken = useRotatePosnetToken(rotateTokenId ?? 0);
 
   const handleDelete = async () => {
     if (deleteId) {
@@ -92,31 +90,30 @@ export function PosTable({ posnets, eventId, onEdit }: PosTableProps) {
     }
   };
 
-  const handleRotateToken = async () => {
-    if (rotateTokenId) {
-      const result = await rotateToken.mutateAsync();
-      // Copy new token to clipboard
-      await navigator.clipboard.writeText(result.authToken);
-      toast.success('New token copied to clipboard');
-      setRotateTokenId(null);
-    }
-  };
-
   const copyCode = async (code: string) => {
     await navigator.clipboard.writeText(code);
-    toast.success('Code copied to clipboard');
+    toast.success('Código copiado al portapapeles');
   };
 
-  const openKiosk = (posnetId: number) => {
-    window.open(`/pos/${posnetId}/kiosk`, '_blank');
+  const openKiosk = async (posnet: Posnet) => {
+    try {
+      // Auto-login to POS using the posnet code
+      const response = await posDeviceApi.login(posnet.code);
+      localStorage.setItem('pos_token', response.accessToken);
+      localStorage.setItem('pos_id', String(response.posnet.id));
+      localStorage.setItem('pos_name', response.posnet.name);
+      window.open(`/pos/${posnet.id}/kiosk`, '_blank');
+    } catch {
+      toast.error('No se pudo abrir el kiosco. Verifica que el POS esté habilitado.');
+    }
   };
 
   if (posnets.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
         <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
-        <p>No POS terminals configured</p>
-        <p className="text-sm">Create a terminal to get started</p>
+        <p>No hay terminales POS configurados</p>
+        <p className="text-sm">Creá un terminal para empezar</p>
       </div>
     );
   }
@@ -126,12 +123,12 @@ export function PosTable({ posnets, eventId, onEdit }: PosTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Code</TableHead>
-            <TableHead>Bar</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Traffic</TableHead>
-            <TableHead>Last Heartbeat</TableHead>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Código</TableHead>
+            <TableHead>Barra</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead>Tráfico</TableHead>
+            <TableHead>Última Señal</TableHead>
             <TableHead className="w-[80px]"></TableHead>
           </TableRow>
         </TableHeader>
@@ -152,7 +149,7 @@ export function PosTable({ posnets, eventId, onEdit }: PosTableProps) {
                   <Copy className="h-3 w-3" />
                 </Button>
               </TableCell>
-              <TableCell>{posnet.bar?.name || `Bar #${posnet.barId}`}</TableCell>
+              <TableCell>{posnet.bar?.name || 'Barra desconocida'}</TableCell>
               <TableCell>
                 <StatusBadge status={posnet.status} />
               </TableCell>
@@ -186,22 +183,18 @@ export function PosTable({ posnets, eventId, onEdit }: PosTableProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openKiosk(posnet.id)}>
+                    <DropdownMenuItem onClick={() => openKiosk(posnet)}>
                       <ExternalLink className="h-4 w-4 mr-2" />
-                      Open Kiosk
+                      Abrir Kiosko
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => copyCode(posnet.code)}>
                       <Copy className="h-4 w-4 mr-2" />
-                      Copy Code
+                      Copiar Código
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => onEdit(posnet)}>
                       <Pencil className="h-4 w-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setRotateTokenId(posnet.id)}>
-                      <Key className="h-4 w-4 mr-2" />
-                      Rotate Token
+                      Editar
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
@@ -209,7 +202,7 @@ export function PosTable({ posnets, eventId, onEdit }: PosTableProps) {
                       onClick={() => setDeleteId(posnet.id)}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
+                      Eliminar
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -223,45 +216,23 @@ export function PosTable({ posnets, eventId, onEdit }: PosTableProps) {
       <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete POS Terminal?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar Terminal POS?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. The terminal will be permanently removed and
-              any active sessions will be terminated.
+              Esta acción no se puede deshacer. El terminal se eliminará permanentemente y las sesiones activas se terminarán.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Rotate Token Confirmation */}
-      <AlertDialog
-        open={rotateTokenId !== null}
-        onOpenChange={() => setRotateTokenId(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Rotate Authentication Token?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will generate a new authentication token and invalidate the current
-              one. The terminal will need to re-authenticate.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRotateToken}>
-              Rotate Token
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

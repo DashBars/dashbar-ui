@@ -32,11 +32,11 @@ export function useCreateVenue() {
     mutationFn: (dto: CreateVenueDto) => venuesApi.createVenue(dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: venuesKeys.list() });
-      toast.success('Venue created successfully');
+      toast.success('Sede creada correctamente');
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || error.message || 'Error creating venue';
-      toast.error(errorMessage);
+      const msg = error?.response?.data?.message || error.message || 'Error al crear la sede';
+      toast.error(msg);
     },
   });
 }
@@ -48,11 +48,11 @@ export function useUpdateVenue(id: number) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: venuesKeys.list() });
       queryClient.invalidateQueries({ queryKey: venuesKeys.detail(id) });
-      toast.success('Venue updated successfully');
+      toast.success('Sede actualizada correctamente');
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || error.message || 'Error updating venue';
-      toast.error(errorMessage);
+      const msg = error?.response?.data?.message || error.message || 'Error al actualizar la sede';
+      toast.error(msg);
     },
   });
 }
@@ -63,11 +63,11 @@ export function useDeleteVenue() {
     mutationFn: (id: number) => venuesApi.deleteVenue(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: venuesKeys.list() });
-      toast.success('Venue deleted successfully');
+      toast.success('Sede eliminada correctamente');
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || error.message || 'Error deleting venue';
-      toast.error(errorMessage);
+      const msg = error?.response?.data?.message || error.message || 'Error al eliminar la sede';
+      toast.error(msg);
     },
   });
 }

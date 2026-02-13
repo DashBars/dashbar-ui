@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -31,9 +31,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { EventRecipesTab } from '@/components/events/EventRecipesTab';
-import { EventProductsTab } from '@/components/events/EventProductsTab';
+import { EventMonitoringTab } from '@/components/events/EventMonitoringTab';
 import { PosManagementTab } from '@/components/pos';
 import { EventReportTab } from '@/components/reports';
+import { BarPostEventOverview } from '@/components/bars/BarPostEventOverview';
+import { AssignStockWizard } from '@/components/bars/AssignStockWizard';
 
 // Use persisted status from backend (source of truth)
 function getEventStatus(event: ApiEvent): EventStatus {
@@ -41,18 +43,18 @@ function getEventStatus(event: ApiEvent): EventStatus {
 }
 
 function formatDate(dateString: string | null): string {
-  if (!dateString) return 'Not set';
+  if (!dateString) return 'No definido';
   try {
     const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      month: 'short',
+    return date.toLocaleString('es-AR', {
       day: 'numeric',
+      month: 'short',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     });
   } catch {
-    return 'Invalid date';
+    return 'Fecha inválida';
   }
 }
 
@@ -78,7 +80,18 @@ export function EventDetailsPage() {
   const { data: event, isLoading } = useEvent(eventIdNum);
   const { mutate: deleteEvent } = useDeleteEvent();
   const { mutate: archiveEvent } = useArchiveEvent();
-  
+
+  const status = event ? getEventStatus(event) : 'upcoming';
+  const isFinished = status === 'finished' || status === 'archived';
+
+  const location = useLocation();
+  // Support deep-linking to a specific tab via location.state.tab
+  const stateTab = (location.state as { tab?: string } | null)?.tab;
+  const isActive = status === 'active';
+  // Default tab: "monitoring" for active events, "overview" for finished, "bars" for upcoming
+  const defaultTab = stateTab || (isActive ? 'monitoring' : isFinished ? 'overview' : 'bars');
+  const [activeTab, setActiveTab] = useState(defaultTab);
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activateDialogOpen, setActivateDialogOpen] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
@@ -90,6 +103,7 @@ export function EventDetailsPage() {
   const [statusFilter, setStatusFilter] = useState<BarStatus | 'all'>('all');
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingBar, setEditingBar] = useState<Bar | null>(null);
+  const [stockWizardOpen, setStockWizardOpen] = useState(false);
 
   const filteredBars = useMemo(() => {
     if (!bars) return [];
@@ -98,20 +112,13 @@ export function EventDetailsPage() {
         bar.name.toLowerCase().includes(search.toLowerCase());
       const matchesType = typeFilter === 'all' || bar.type === typeFilter;
       
-      // Fix: lowStock is a derived state, not exclusive
-      // If filtering by lowStock, show bars that are lowStock (they can also be open)
-      // If filtering by open, show open bars (including those that are also lowStock)
-      // If filtering by closed, show only closed bars
       let matchesStatus = true;
       if (statusFilter !== 'all') {
         if (statusFilter === 'lowStock') {
-          // Show bars with lowStock status
           matchesStatus = bar.status === 'lowStock';
         } else if (statusFilter === 'open') {
-          // Show open bars, including those that are also lowStock
           matchesStatus = bar.status === 'open' || bar.status === 'lowStock';
         } else {
-          // For closed, show only closed bars
           matchesStatus = bar.status === statusFilter;
         }
       }
@@ -151,16 +158,14 @@ export function EventDetailsPage() {
         <Card className="rounded-2xl">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <p className="text-lg font-medium text-muted-foreground mb-4">
-              Event not found
+              Evento no encontrado
             </p>
-            <Button onClick={() => navigate('/events')}>Back to Events</Button>
+            <Button onClick={() => navigate('/events')}>Volver a Eventos</Button>
           </CardContent>
         </Card>
       </div>
     );
   }
-
-  const status = getEventStatus(event);
 
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
@@ -191,7 +196,7 @@ export function EventDetailsPage() {
         </Button>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Link to="/events" className="hover:text-foreground">
-            Events
+            Eventos
           </Link>
           <ChevronRight className="h-4 w-4" />
           <span className="text-foreground">{event.name}</span>
@@ -199,12 +204,12 @@ export function EventDetailsPage() {
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">{event.name}</h1>
             <p className="text-muted-foreground mt-1">
-              {event.description || 'No description'}
+              {event.description || 'Sin descripción'}
             </p>
           </div>
           <StatusBadge status={status} />
@@ -255,91 +260,70 @@ export function EventDetailsPage() {
         </div>
       </div>
 
+      {/* Event info bar - always visible below header */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-muted-foreground mb-6">
+        {event.startedAt && (
+          <span className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5" />
+            Inicio: <span className="text-foreground font-medium">{formatDate(event.startedAt)}</span>
+          </span>
+        )}
+        {event.finishedAt && (
+          <span className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5" />
+            Fin: <span className="text-foreground font-medium">{formatDate(event.finishedAt)}</span>
+          </span>
+        )}
+        {event.venue && (
+          <span className="flex items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5" />
+            <span className="text-foreground font-medium">{event.venue.name}</span>
+            <span className="text-xs">({event.venue.city}, {event.venue.country})</span>
+          </span>
+        )}
+      </div>
+
       {/* Tabs */}
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="bars">Bars</TabsTrigger>
-          <TabsTrigger value="prices">Productos</TabsTrigger>
-          <TabsTrigger value="recipes">Recetas</TabsTrigger>
+          {/* Monitoring tab only for active events */}
+          {isActive && (
+            <TabsTrigger value="monitoring">Monitoreo</TabsTrigger>
+          )}
+          {/* Overview tab only for finished/archived */}
+          {isFinished && (
+            <TabsTrigger value="overview">Resumen</TabsTrigger>
+          )}
+          <TabsTrigger value="bars">Barras</TabsTrigger>
+          <TabsTrigger value="recipes">Recetas y Productos</TabsTrigger>
           <TabsTrigger value="pos">POS</TabsTrigger>
-          {(status === 'finished' || status === 'archived') && (
+          {isFinished && (
             <TabsTrigger value="reports">Reportes</TabsTrigger>
           )}
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="rounded-2xl">
-              <CardHeader>
-                <CardTitle className="text-lg">Event Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground mb-1">
-                    Status
-                  </div>
-                  <StatusBadge status={status} />
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Started At
-                  </div>
-                  <div className="text-base">{formatDate(event.startedAt)}</div>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Finished At
-                  </div>
-                  <div className="text-base">{formatDate(event.finishedAt)}</div>
-                </div>
-                {event.venue && (
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      Venue
-                    </div>
-                    <div className="text-base">{event.venue.name}</div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {event.venue.address}, {event.venue.city}, {event.venue.country}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+        {/* Monitoring - only for active events */}
+        {isActive && (
+          <TabsContent value="monitoring" className="space-y-4">
+            <EventMonitoringTab eventId={eventIdNum} />
+          </TabsContent>
+        )}
 
-            <Card className="rounded-2xl">
-              <CardHeader>
-                <CardTitle className="text-lg">Metrics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground">
-                  Metrics and analytics will be available here once the event is finished.
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="prices" className="space-y-4">
-          <EventProductsTab
-            eventId={eventIdNum}
-            isEditable={status === 'upcoming' || status === 'active'}
-          />
-        </TabsContent>
-
-        <TabsContent value="recipes" className="space-y-4">
-          <EventRecipesTab eventId={eventIdNum} isEditable={status === 'upcoming'} />
-        </TabsContent>
+        {/* Overview - only for finished/archived events */}
+        {isFinished && (
+          <TabsContent value="overview" className="space-y-4">
+            <BarPostEventOverview eventId={eventIdNum} />
+          </TabsContent>
+        )}
 
         <TabsContent value="bars" className="space-y-4">
           <BarsPageHeader
             eventId={eventIdNum}
             eventName={event.name}
             onCreateBar={handleCreateBar}
-            isEventFinished={status === 'finished' || status === 'archived'}
+            onLoadStock={() => setStockWizardOpen(true)}
+            isEditable={status === 'upcoming'}
+            hasBars={(bars || []).length > 0}
           />
           <BarsSummaryCards bars={bars || []} isLoading={isLoadingBars} />
           <BarsFilters
@@ -350,18 +334,22 @@ export function EventDetailsPage() {
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
           />
-              <BarsTable
-                bars={filteredBars}
-                isLoading={isLoadingBars}
-                onViewDetails={handleBarClick}
-              />
+          <BarsTable
+            bars={filteredBars}
+            isLoading={isLoadingBars}
+            onViewDetails={handleBarClick}
+          />
+        </TabsContent>
+
+        <TabsContent value="recipes" className="space-y-4">
+          <EventRecipesTab eventId={eventIdNum} isEditable={status === 'upcoming'} />
         </TabsContent>
 
         <TabsContent value="pos" className="space-y-4">
           <PosManagementTab eventId={eventIdNum} />
         </TabsContent>
 
-        {(status === 'finished' || status === 'archived') && (
+        {isFinished && (
           <TabsContent value="reports" className="space-y-4">
             <EventReportTab eventId={eventIdNum} eventName={event.name} />
           </TabsContent>
@@ -374,6 +362,13 @@ export function EventDetailsPage() {
         bar={editingBar}
         open={formDialogOpen}
         onOpenChange={setFormDialogOpen}
+      />
+
+      <AssignStockWizard
+        eventId={eventIdNum}
+        bars={bars || []}
+        open={stockWizardOpen}
+        onOpenChange={setStockWizardOpen}
       />
 
       {event && status === 'upcoming' && (
@@ -390,8 +385,8 @@ export function EventDetailsPage() {
           <DialogHeader>
             <DialogTitle>Eliminar Evento</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que quieres eliminar "{event?.name}"? Esta acción no se puede deshacer.
-              Solo puedes eliminar eventos en estado "upcoming".
+              ¿Estás seguro de que querés eliminar "{event?.name}"? Esta acción no se puede deshacer.
+              Solo podés eliminar eventos en estado "próximo".
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

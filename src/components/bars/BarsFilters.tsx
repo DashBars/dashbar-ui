@@ -31,7 +31,7 @@ export function BarsFilters({
       <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search bars..."
+          placeholder="Buscar barras..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-9"
@@ -44,10 +44,10 @@ export function BarsFilters({
         }
       >
         <SelectTrigger className="w-full sm:w-[180px]">
-          <SelectValue placeholder="Type" />
+          <SelectValue placeholder="Tipo" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Types</SelectItem>
+          <SelectItem value="all">Todos los tipos</SelectItem>
           <SelectItem value="VIP">VIP</SelectItem>
           <SelectItem value="general">General</SelectItem>
           <SelectItem value="backstage">Backstage</SelectItem>
@@ -61,13 +61,13 @@ export function BarsFilters({
         }
       >
         <SelectTrigger className="w-full sm:w-[180px]">
-          <SelectValue placeholder="Status" />
+          <SelectValue placeholder="Estado" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
-          <SelectItem value="open">Open</SelectItem>
-          <SelectItem value="closed">Closed</SelectItem>
-          <SelectItem value="lowStock">Low Stock</SelectItem>
+          <SelectItem value="all">Todos los estados</SelectItem>
+          <SelectItem value="open">Abierta</SelectItem>
+          <SelectItem value="closed">Cerrada</SelectItem>
+          <SelectItem value="lowStock">Stock bajo</SelectItem>
         </SelectContent>
       </Select>
     </div>

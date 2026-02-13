@@ -122,11 +122,11 @@ export function EventsListPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Venue</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Start</TableHead>
-                    <TableHead>End</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Sede</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Inicio</TableHead>
+                    <TableHead>Fin</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -162,15 +162,15 @@ export function EventsListPage() {
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Events</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Eventos</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your events and their lifecycle
+            Gestioná tus eventos y su ciclo de vida
           </p>
         </div>
         {events.length > 0 && (
           <Button onClick={handleCreate}>
             <Plus className="mr-2 h-4 w-4" />
-            Create event
+            Crear evento
           </Button>
         )}
       </div>
@@ -179,15 +179,14 @@ export function EventsListPage() {
         <Card className="rounded-2xl">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <p className="text-lg font-medium text-muted-foreground mb-4">
-              No events yet
+              Todavía no hay eventos
             </p>
             <p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
-              Get started by creating your first event. You'll be able to configure bars,
-              recipes, and prices for each event.
+              Empezá creando tu primer evento. Vas a poder configurar barras, recetas y precios para cada uno.
             </p>
             <Button onClick={handleCreate}>
               <Plus className="mr-2 h-4 w-4" />
-              Create your first event
+              Creá tu primer evento
             </Button>
           </CardContent>
         </Card>
@@ -203,20 +202,20 @@ export function EventsListPage() {
           <TabsContent value="active" className="space-y-4">
             <div className="flex gap-4">
               <Input
-                placeholder="Search events..."
+                placeholder="Buscar eventos..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="max-w-sm"
               />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by status" />
+                  <SelectValue placeholder="Filtrar por estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="upcoming">Upcoming</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="finished">Finished</SelectItem>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="upcoming">Próximos</SelectItem>
+                  <SelectItem value="active">Activos</SelectItem>
+                  <SelectItem value="finished">Finalizados</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -226,11 +225,11 @@ export function EventsListPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Venue</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Start</TableHead>
-                      <TableHead>End</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Sede</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Inicio</TableHead>
+                      <TableHead>Fin</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -240,7 +239,7 @@ export function EventsListPage() {
                           colSpan={5}
                           className="h-24 text-center text-muted-foreground"
                         >
-                          No events found
+                          No se encontraron eventos
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -261,7 +260,7 @@ export function EventsListPage() {
                               {status === 'upcoming' && event.startedAt ? (
                                 <div className="flex flex-col">
                                   <span className="text-muted-foreground text-xs">
-                                    Scheduled:
+                                    Programado:
                                   </span>
                                   <span>{formatDate(event.startedAt)}</span>
                                 </div>
@@ -283,7 +282,7 @@ export function EventsListPage() {
           <TabsContent value="archived" className="space-y-4">
             <div className="flex gap-4">
               <Input
-                placeholder="Search archived events..."
+                placeholder="Buscar eventos archivados..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="max-w-sm"
@@ -295,11 +294,11 @@ export function EventsListPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Venue</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Start</TableHead>
-                      <TableHead>End</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Sede</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Inicio</TableHead>
+                      <TableHead>Fin</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -310,7 +309,7 @@ export function EventsListPage() {
                           colSpan={6}
                           className="h-24 text-center text-muted-foreground"
                         >
-                          No archived events
+                          No hay eventos archivados
                         </TableCell>
                       </TableRow>
                     ) : (

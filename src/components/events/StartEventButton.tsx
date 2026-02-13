@@ -30,16 +30,15 @@ export function StartEventButton({ event }: StartEventButtonProps) {
     <>
       <Button onClick={() => setDialogOpen(true)} disabled={isPending}>
         <Play className="mr-2 h-4 w-4" />
-        Start Event
+        Iniciar Evento
       </Button>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Start Event</DialogTitle>
+            <DialogTitle>Iniciar Evento</DialogTitle>
             <DialogDescription>
-              Are you sure you want to start "{event.name}"? Once started,
-              recipes and prices will be locked and cannot be modified.
+              ¿Estás seguro de que querés iniciar "{event.name}"? Una vez iniciado, las recetas y precios se bloquearán y no podrán modificarse.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -48,10 +47,10 @@ export function StartEventButton({ event }: StartEventButtonProps) {
               onClick={() => setDialogOpen(false)}
               disabled={isPending}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button onClick={handleConfirm} disabled={isPending}>
-              {isPending ? 'Starting...' : 'Start Event'}
+              {isPending ? 'Iniciando...' : 'Iniciar Evento'}
             </Button>
           </DialogFooter>
         </DialogContent>

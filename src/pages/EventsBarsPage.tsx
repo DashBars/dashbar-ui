@@ -18,7 +18,7 @@ export function EventsBarsPage() {
   const { data: bars, isLoading, error } = useBars(eventIdNum);
   const { data: event } = useEvent(eventIdNum);
   
-  const isEventFinished = event?.finishedAt !== null;
+  const isEditable = event?.status === 'upcoming';
 
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<BarType | 'all'>('all');
@@ -67,14 +67,14 @@ export function EventsBarsPage() {
           </Button>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Link to="/events" className="hover:text-foreground">
-              Events
+              Eventos
             </Link>
             <ChevronRight className="h-4 w-4" />
             <Link to={`/events/${eventIdNum}`} className="hover:text-foreground">
               {event?.name || `Event ${eventIdNum}`}
             </Link>
             <ChevronRight className="h-4 w-4" />
-            <span className="text-foreground">Bars</span>
+            <span className="text-foreground">Barras</span>
           </div>
         </div>
 
@@ -82,11 +82,11 @@ export function EventsBarsPage() {
           eventId={eventIdNum}
           eventName={event?.name}
           onCreateBar={handleCreateBar}
-          isEventFinished={isEventFinished}
+          isEditable={isEditable}
         />
         <div className="rounded-lg border border-destructive bg-destructive/10 p-6 text-center">
           <h3 className="text-lg font-semibold text-destructive mb-2">
-            {isUnauthorized ? 'Autenticación requerida' : 'Error al cargar bars'}
+            {isUnauthorized ? 'Autenticación requerida' : 'Error al cargar barras'}
           </h3>
           <p className="text-sm text-muted-foreground mb-4">{errorMessage}</p>
           {isUnauthorized && (
@@ -114,14 +114,14 @@ export function EventsBarsPage() {
         </Button>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Link to="/events" className="hover:text-foreground">
-            Events
+            Eventos
           </Link>
           <ChevronRight className="h-4 w-4" />
           <Link to={`/events/${eventIdNum}`} className="hover:text-foreground">
-            {event?.name || `Event ${eventIdNum}`}
+            {event?.name || `Evento ${eventIdNum}`}
           </Link>
           <ChevronRight className="h-4 w-4" />
-          <span className="text-foreground">Bars</span>
+          <span className="text-foreground">Barras</span>
         </div>
       </div>
 
@@ -129,7 +129,7 @@ export function EventsBarsPage() {
         eventId={eventIdNum}
         eventName={event?.name}
         onCreateBar={handleCreateBar}
-        isEventFinished={isEventFinished}
+        isEditable={isEditable}
       />
       <BarsSummaryCards bars={bars} isLoading={isLoading} />
       <BarsFilters

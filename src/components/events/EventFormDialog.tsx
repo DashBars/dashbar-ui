@@ -79,7 +79,7 @@ export function EventFormDialog({
     e.preventDefault();
     
     if (!isEdit && !venueId) {
-      toast.error('Please select a venue');
+      toast.error('Seleccioná una sede');
       return;
     }
 
@@ -93,7 +93,7 @@ export function EventFormDialog({
       const scheduledDateObj = new Date(scheduledStartAt);
       const now = new Date();
       if (scheduledDateObj <= now) {
-        toast.error('Scheduled start time must be in the future');
+        toast.error('La fecha de inicio debe ser en el futuro');
         return;
       }
     }
@@ -127,18 +127,18 @@ export function EventFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Event' : 'New Event'}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Editar Evento' : 'Nuevo Evento'}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? 'Update event information.'
-              : 'Create a new event. You can start it later when ready.'}
+              ? 'Actualizá la información del evento.'
+              : 'Creá un nuevo evento. Podés iniciarlo más tarde cuando estés listo.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="name">
-                Name <span className="text-destructive">*</span>
+                Nombre <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="name"
@@ -146,27 +146,27 @@ export function EventFormDialog({
                 onChange={(e) => setName(e.target.value)}
                 required
                 disabled={isSubmitting}
-                placeholder="Event name"
+                placeholder="Nombre del evento"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">Descripción</Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={isSubmitting}
-                placeholder="Optional description"
+                placeholder="Descripción opcional"
                 rows={3}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="venue">
-                Venue <span className="text-destructive">*</span>
+                Sede <span className="text-destructive">*</span>
               </Label>
               {venues.length === 0 && !isLoadingVenues ? (
                 <p className="text-sm text-muted-foreground py-2">
-                  No hay venues.{' '}
+                  No hay sedes.{' '}
                   <Link
                     to="/venues"
                     className="text-primary underline-offset-4 hover:underline"
@@ -178,7 +178,7 @@ export function EventFormDialog({
               ) : (
                 <Select value={venueId} onValueChange={setVenueId} disabled={isSubmitting || isLoadingVenues}>
                   <SelectTrigger id="venue">
-                    <SelectValue placeholder={isLoadingVenues ? "Cargando..." : "Seleccionar venue"} />
+                    <SelectValue placeholder={isLoadingVenues ? "Cargando..." : "Seleccionar sede"} />
                   </SelectTrigger>
                   <SelectContent>
                     {venues.map((venue) => (
@@ -192,7 +192,7 @@ export function EventFormDialog({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="scheduledDate">Scheduled Start Date</Label>
+                <Label htmlFor="scheduledDate">Fecha de Inicio Programada</Label>
                 <Input
                   id="scheduledDate"
                   type="date"
@@ -203,7 +203,7 @@ export function EventFormDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="scheduledTime">Scheduled Start Time</Label>
+                <Label htmlFor="scheduledTime">Hora de Inicio Programada</Label>
                 <Input
                   id="scheduledTime"
                   type="time"
@@ -214,7 +214,7 @@ export function EventFormDialog({
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Optional. The event will remain "upcoming" until you manually activate it. When you activate it, the actual start time will be recorded.
+              Opcional. El evento permanecerá como "próximo" hasta que lo actives manualmente. Al activarlo, se registrará la hora real de inicio.
             </p>
           </div>
           <DialogFooter>
@@ -224,16 +224,16 @@ export function EventFormDialog({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isEdit ? 'Updating...' : 'Creating...'}
+                  {isEdit ? 'Actualizando...' : 'Creando...'}
                 </>
               ) : (
-                isEdit ? 'Update' : 'Create'
+                isEdit ? 'Actualizar' : 'Crear'
               )}
             </Button>
           </DialogFooter>

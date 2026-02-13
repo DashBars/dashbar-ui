@@ -64,15 +64,15 @@ export function VenuesPage() {
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Venues</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Sedes</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your venues and locations
+            Gestioná tus sedes y ubicaciones
           </p>
         </div>
         {venues.length > 0 && (
           <Button onClick={handleCreate}>
             <Plus className="mr-2 h-4 w-4" />
-            Create venue
+            Crear sede
           </Button>
         )}
       </div>
@@ -81,21 +81,21 @@ export function VenuesPage() {
         <Card className="rounded-2xl">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <p className="text-lg font-medium text-muted-foreground mb-4">
-              You don't have any venues yet
+              Todavía no tenés sedes
             </p>
             <p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
-              Get started by creating your first venue. You'll be able to use it when creating events.
+              Empezá creando tu primera sede. Vas a poder usarla al crear eventos.
             </p>
             <Button onClick={handleCreate}>
               <Plus className="mr-2 h-4 w-4" />
-              Create your first venue
+              Creá tu primera sede
             </Button>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-4">
           <Input
-            placeholder="Search venues by name, city, country, or address..."
+            placeholder="Buscar sedes por nombre, ciudad, país o dirección..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-sm"
@@ -107,6 +107,7 @@ export function VenuesPage() {
                 isLoading={isLoading}
                 onEdit={handleEdit}
                 onDelete={handleDeleteClick}
+                editingVenueId={formDialogOpen ? editingVenue?.id : null}
               />
             </CardContent>
           </Card>
@@ -122,15 +123,15 @@ export function VenuesPage() {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Eliminar Venue</DialogTitle>
+            <DialogTitle>Eliminar Sede</DialogTitle>
             <DialogDescription className="space-y-2">
               <p>
-                ¿Estás seguro de que quieres eliminar "{venueToDelete?.name}"?
+                ¿Estás seguro de que querés eliminar "{venueToDelete?.name}"?
               </p>
               <p className="text-sm text-muted-foreground">
-                <strong>Restricciones:</strong> Solo puedes eliminar un venue si no tiene eventos asignados,
-                o si todos sus eventos están en estado "upcoming". Si tiene eventos activos o finalizados,
-                primero debes eliminarlos o archivarlos.
+                <strong>Restricciones:</strong> Solo podés eliminar una sede si no tiene eventos asignados,
+                o si todos sus eventos están en estado "próximo". Si tiene eventos activos o finalizados,
+                primero tenés que eliminarlos o archivarlos.
               </p>
               <p className="text-sm text-destructive font-medium">
                 Esta acción no se puede deshacer.

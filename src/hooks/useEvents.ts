@@ -32,11 +32,11 @@ export function useCreateEvent() {
     mutationFn: (dto: CreateEventDto) => eventsApi.createEvent(dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: eventsKeys.list() });
-      toast.success('Event created successfully');
+      toast.success('Evento creado correctamente');
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || error.message || 'Error creating event';
-      toast.error(errorMessage);
+      const msg = error?.response?.data?.message || error.message || 'Error al crear el evento';
+      toast.error(msg);
     },
   });
 }
@@ -48,11 +48,11 @@ export function useUpdateEvent(id: number) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: eventsKeys.list() });
       queryClient.invalidateQueries({ queryKey: eventsKeys.detail(id) });
-      toast.success('Event updated successfully');
+      toast.success('Evento actualizado correctamente');
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || error.message || 'Error updating event';
-      toast.error(errorMessage);
+      const msg = error?.response?.data?.message || error.message || 'Error al actualizar el evento';
+      toast.error(msg);
     },
   });
 }
@@ -63,11 +63,11 @@ export function useDeleteEvent() {
     mutationFn: (id: number) => eventsApi.deleteEvent(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: eventsKeys.list() });
-      toast.success('Event deleted successfully');
+      toast.success('Evento eliminado correctamente');
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || error.message || 'Error deleting event';
-      toast.error(errorMessage);
+      const msg = error?.response?.data?.message || error.message || 'Error al eliminar el evento';
+      toast.error(msg);
     },
   });
 }
@@ -79,11 +79,11 @@ export function useStartEvent() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: eventsKeys.list() });
       queryClient.invalidateQueries({ queryKey: eventsKeys.detail(id) });
-      toast.success('Event started successfully');
+      toast.success('Evento iniciado correctamente');
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || error.message || 'Error starting event';
-      toast.error(errorMessage);
+      const msg = error?.response?.data?.message || error.message || 'Error al iniciar el evento';
+      toast.error(msg);
     },
   });
 }
@@ -96,11 +96,11 @@ export function useActivateEvent() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: eventsKeys.list() });
       queryClient.invalidateQueries({ queryKey: eventsKeys.detail(id) });
-      toast.success('Event activated successfully');
+      toast.success('Evento activado correctamente');
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || error.message || 'Error activating event';
-      toast.error(errorMessage);
+      const msg = error?.response?.data?.message || error.message || 'Error al activar el evento';
+      toast.error(msg);
     },
   });
 }
@@ -112,11 +112,11 @@ export function useFinishEvent() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: eventsKeys.list() });
       queryClient.invalidateQueries({ queryKey: eventsKeys.detail(id) });
-      toast.success('Event finished successfully');
+      toast.success('Evento finalizado correctamente');
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || error.message || 'Error finishing event';
-      toast.error(errorMessage);
+      const msg = error?.response?.data?.message || error.message || 'Error al finalizar el evento';
+      toast.error(msg);
     },
   });
 }
@@ -128,11 +128,11 @@ export function useArchiveEvent() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: eventsKeys.list() });
       queryClient.invalidateQueries({ queryKey: eventsKeys.detail(id) });
-      toast.success('Event archived successfully');
+      toast.success('Evento archivado correctamente');
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || error.message || 'Error archiving event';
-      toast.error(errorMessage);
+      const msg = error?.response?.data?.message || error.message || 'Error al archivar el evento';
+      toast.error(msg);
     },
   });
 }
@@ -144,14 +144,11 @@ export function useUnarchiveEvent() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: eventsKeys.list() });
       queryClient.invalidateQueries({ queryKey: eventsKeys.detail(id) });
-      toast.success('Event unarchived successfully');
+      toast.success('Evento desarchivado correctamente');
     },
     onError: (error: any) => {
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        'Error unarchiving event';
-      toast.error(errorMessage);
+      const msg = error?.response?.data?.message || error.message || 'Error al desarchivar el evento';
+      toast.error(msg);
     },
   });
 }

@@ -97,22 +97,22 @@ export function InventoryReceiptDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Add Stock</DialogTitle>
+          <DialogTitle>Agregar Stock</DialogTitle>
           <DialogDescription>
-            Register a new stock receipt for this bar.
+            Registrá un nuevo comprobante de stock para esta barra.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="drink-search">
-                Item <span className="text-destructive">*</span>
+                Insumo <span className="text-destructive">*</span>
               </Label>
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="drink-search"
-                  placeholder="Search by name, brand, or SKU..."
+                  placeholder="Buscar por nombre, marca o SKU..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -125,7 +125,7 @@ export function InventoryReceiptDialog({
                   required
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select an item" />
+                    <SelectValue placeholder="Seleccionar un insumo" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
                     {displayDrinks.map((drink) => (
@@ -140,7 +140,7 @@ export function InventoryReceiptDialog({
 
             <div className="space-y-2">
               <Label htmlFor="supplier">
-                Supplier <span className="text-destructive">*</span>
+                Proveedor <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={supplierId ? String(supplierId) : ''}
@@ -148,7 +148,7 @@ export function InventoryReceiptDialog({
                 required
               >
                 <SelectTrigger id="supplier">
-                  <SelectValue placeholder="Select a supplier" />
+                  <SelectValue placeholder="Seleccionar un proveedor" />
                 </SelectTrigger>
                 <SelectContent>
                   {suppliers.map((supplier) => (
@@ -163,7 +163,7 @@ export function InventoryReceiptDialog({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="quantity">
-                  Quantity <span className="text-destructive">*</span>
+                  Cantidad <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="quantity"
@@ -179,7 +179,7 @@ export function InventoryReceiptDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ownership">Ownership</Label>
+                <Label htmlFor="ownership">Propiedad</Label>
                 <Select
                   value={ownershipMode}
                   onValueChange={(value) =>
@@ -190,8 +190,8 @@ export function InventoryReceiptDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="purchased">Purchased</SelectItem>
-                    <SelectItem value="consignment">Consignment</SelectItem>
+                    <SelectItem value="purchased">Comprado</SelectItem>
+                    <SelectItem value="consignment">Consignación</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -200,7 +200,7 @@ export function InventoryReceiptDialog({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="unit-cost">
-                  Unit Cost <span className="text-destructive">*</span>
+                  Costo Unitario <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="unit-cost"
@@ -218,7 +218,7 @@ export function InventoryReceiptDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="currency">Currency</Label>
+                <Label htmlFor="currency">Moneda</Label>
                 <Select value={currency} onValueChange={setCurrency}>
                   <SelectTrigger id="currency">
                     <SelectValue />
@@ -234,7 +234,7 @@ export function InventoryReceiptDialog({
 
             <div className="rounded-lg bg-muted p-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Total Value:</span>
+                <span className="text-sm font-medium">Valor Total:</span>
                 <span className="text-lg font-bold">
                   {currency} {totalValue}
                 </span>
@@ -248,16 +248,16 @@ export function InventoryReceiptDialog({
               onClick={() => onOpenChange(false)}
               disabled={isPending}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button type="submit" disabled={isPending}>
               {isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
+                  Agregando...
                 </>
               ) : (
-                'Add Stock'
+                'Agregar Stock'
               )}
             </Button>
           </DialogFooter>

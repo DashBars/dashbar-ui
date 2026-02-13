@@ -96,10 +96,10 @@ export function StockOnHandTab({ eventId, barId }: StockOnHandTabProps) {
             <TableHeader>
               <TableRow>
                 <TableHead></TableHead>
-                <TableHead>Item</TableHead>
-                <TableHead>Total Quantity</TableHead>
-                <TableHead>Suppliers</TableHead>
-                <TableHead>Valuation</TableHead>
+                <TableHead>Insumo</TableHead>
+                <TableHead>Cantidad Total</TableHead>
+                <TableHead>Proveedores</TableHead>
+                <TableHead>Valuación</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -133,7 +133,7 @@ export function StockOnHandTab({ eventId, barId }: StockOnHandTabProps) {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-4">
         <Input
-          placeholder="Search items..."
+          placeholder="Buscar items..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
@@ -145,10 +145,10 @@ export function StockOnHandTab({ eventId, barId }: StockOnHandTabProps) {
           }
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by supplier" />
+            <SelectValue placeholder="Filtrar por proveedor" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Suppliers</SelectItem>
+            <SelectItem value="all">Todos los proveedores</SelectItem>
             {suppliers.map((s) => (
               <SelectItem key={s.id} value={String(s.id)}>
                 {s.name}
@@ -163,12 +163,12 @@ export function StockOnHandTab({ eventId, barId }: StockOnHandTabProps) {
           }
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by ownership" />
+            <SelectValue placeholder="Filtrar por propiedad" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Ownership</SelectItem>
-            <SelectItem value="purchased">Purchased</SelectItem>
-            <SelectItem value="consignment">Consignment</SelectItem>
+            <SelectItem value="all">Todos los tipos</SelectItem>
+            <SelectItem value="purchased">Comprado</SelectItem>
+            <SelectItem value="consignment">Consignación</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -178,17 +178,17 @@ export function StockOnHandTab({ eventId, barId }: StockOnHandTabProps) {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[50px]"></TableHead>
-              <TableHead>Item</TableHead>
-              <TableHead>Total Quantity</TableHead>
-              <TableHead>Suppliers</TableHead>
-              <TableHead>Valuation</TableHead>
+              <TableHead>Insumo</TableHead>
+              <TableHead>Cantidad Total</TableHead>
+              <TableHead>Proveedores</TableHead>
+              <TableHead>Valuación</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredSummary.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                  No stock found
+                  No se encontró stock
                 </TableCell>
               </TableRow>
             ) : (
@@ -220,12 +220,23 @@ export function StockOnHandTab({ eventId, barId }: StockOnHandTabProps) {
                         <div>
                           <div>{item.drinkName}</div>
                           <div className="text-xs text-muted-foreground">
-                            {item.drinkBrand}
+                            {item.drinkBrand} {item.drinkVolume ? `(${item.drinkVolume} ml)` : ''}
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{item.totalQuantity}</TableCell>
-                      <TableCell>{item.supplierCount} suppliers</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">
+                            {item.unitCount !== undefined ? `${item.unitCount} ${item.unitCount === 1 ? 'unidad' : 'unidades'}` : item.totalQuantity}
+                          </div>
+                          {item.drinkVolume > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              {(item.totalQuantity / 1000).toFixed(1)} L ({item.totalQuantity.toLocaleString()} ml)
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{item.supplierCount} proveedores</TableCell>
                       <TableCell>
                         {breakdown.length > 0
                           ? breakdown
@@ -247,7 +258,7 @@ export function StockOnHandTab({ eventId, barId }: StockOnHandTabProps) {
                           <TableCell className="pl-8">
                             <div className="flex items-center gap-2">
                               <span className="text-sm">
-                                {stock.supplier?.name || 'Unknown'}
+                                {stock.supplier?.name || 'Desconocido'}
                               </span>
                               <Badge
                                 variant={
@@ -256,13 +267,22 @@ export function StockOnHandTab({ eventId, barId }: StockOnHandTabProps) {
                                     : 'outline'
                                 }
                               >
-                                {stock.ownershipMode}
+                                {stock.ownershipMode === 'consignment' ? 'Consignación' : 'Comprado'}
                               </Badge>
                             </div>
                           </TableCell>
-                          <TableCell>{stock.quantity}</TableCell>
                           <TableCell>
-                            {stock.supplier?.name || 'Unknown'}
+                            <div>
+                              <div>{stock.drink?.volume ? `${Math.floor(stock.quantity / stock.drink.volume)} un.` : stock.quantity}</div>
+                              {stock.drink?.volume ? (
+                                <div className="text-xs text-muted-foreground">
+                                  {stock.quantity.toLocaleString()} ml
+                                </div>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {stock.supplier?.name || 'Desconocido'}
                           </TableCell>
                           <TableCell>
                             {stock.currency} {((stock.unitCost * stock.quantity) / 100).toLocaleString('en-US', {
@@ -270,7 +290,7 @@ export function StockOnHandTab({ eventId, barId }: StockOnHandTabProps) {
                               maximumFractionDigits: 2,
                             })}
                             <span className="text-xs text-muted-foreground ml-1">
-                              ({stock.currency} {(stock.unitCost / 100).toFixed(2)}/unit)
+                              ({stock.currency} {(stock.unitCost / 100).toFixed(2)}/unidad)
                             </span>
                           </TableCell>
                         </TableRow>

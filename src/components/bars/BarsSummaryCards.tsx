@@ -1,4 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import type { Bar } from '@/lib/api/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -12,20 +13,7 @@ export function BarsSummaryCards({
   isLoading,
 }: BarsSummaryCardsProps) {
   if (isLoading) {
-    return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-        {[1, 2, 3, 4].map((i) => (
-          <Card key={i}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <Skeleton className="h-4 w-24" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-8 w-16" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
+    return <Skeleton className="h-10 w-full rounded-2xl" />;
   }
 
   const totalBars = bars?.length || 0;
@@ -34,39 +22,37 @@ export function BarsSummaryCards({
   const lowStockBars = bars?.filter((b) => b.status === 'lowStock').length || 0;
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Bars</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{totalBars}</div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Open</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{openBars}</div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Closed</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{closedBars}</div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Low Stock</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{lowStockBars}</div>
-        </CardContent>
-      </Card>
-    </div>
+    <Card className="rounded-2xl">
+      <CardContent className="px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Total</span>
+            <Badge variant="secondary" className="text-sm font-semibold px-2.5">
+              {totalBars}
+            </Badge>
+          </div>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-green-500" />
+            <span className="text-sm text-muted-foreground">Abiertas</span>
+            <span className="text-sm font-semibold">{openBars}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-gray-400" />
+            <span className="text-sm text-muted-foreground">Cerradas</span>
+            <span className="text-sm font-semibold">{closedBars}</span>
+          </div>
+          {lowStockBars > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              <span className="text-sm text-muted-foreground">Stock bajo</span>
+              <Badge variant="outline" className="text-xs border-amber-300 bg-amber-50 text-amber-700 px-1.5">
+                {lowStockBars}
+              </Badge>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

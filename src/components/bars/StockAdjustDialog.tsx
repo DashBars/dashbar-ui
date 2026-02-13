@@ -109,10 +109,9 @@ export function StockAdjustDialog({
       <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Adjust Stock</DialogTitle>
+            <DialogTitle>Ajustar Stock</DialogTitle>
             <DialogDescription>
-              Add or update stock entries for this bar. You can add multiple
-              items at once.
+              Agregá o actualizá items de stock para esta barra. Podés agregar varios a la vez.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -136,7 +135,7 @@ export function StockAdjustDialog({
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor={`drinkId-${index}`}>Drink ID</Label>
+                      <Label htmlFor={`drinkId-${index}`}>ID del Insumo</Label>
                       <Input
                         id={`drinkId-${index}`}
                         type="number"
@@ -149,7 +148,7 @@ export function StockAdjustDialog({
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor={`supplierId-${index}`}>Supplier ID</Label>
+                      <Label htmlFor={`supplierId-${index}`}>ID del Proveedor</Label>
                       <Input
                         id={`supplierId-${index}`}
                         type="number"
@@ -168,7 +167,7 @@ export function StockAdjustDialog({
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor={`quantity-${index}`}>Quantity</Label>
+                      <Label htmlFor={`quantity-${index}`}>Cantidad</Label>
                       <Input
                         id={`quantity-${index}`}
                         type="number"
@@ -185,7 +184,7 @@ export function StockAdjustDialog({
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor={`unitCost-${index}`}>Unit Cost (cents)</Label>
+                      <Label htmlFor={`unitCost-${index}`}>Costo Unitario (centavos)</Label>
                       <Input
                         id={`unitCost-${index}`}
                         type="number"
@@ -202,7 +201,7 @@ export function StockAdjustDialog({
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor={`currency-${index}`}>Currency</Label>
+                      <Label htmlFor={`currency-${index}`}>Moneda</Label>
                       <Input
                         id={`currency-${index}`}
                         value={item.currency || 'ARS'}
@@ -215,7 +214,7 @@ export function StockAdjustDialog({
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor={`ownershipMode-${index}`}>
-                      Ownership Mode
+                      Tipo de Propiedad
                     </Label>
                     <Select
                       value={item.ownershipMode}
@@ -227,8 +226,8 @@ export function StockAdjustDialog({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="purchased">Purchased</SelectItem>
-                        <SelectItem value="consignment">Consignment</SelectItem>
+                        <SelectItem value="purchased">Comprado</SelectItem>
+                        <SelectItem value="consignment">Consignación</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -242,17 +241,17 @@ export function StockAdjustDialog({
               className="w-full gap-2"
             >
               <Plus className="h-4 w-4" />
-              Add Another Item
+              Agregar otro item
             </Button>
             {totalCost > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Preview</CardTitle>
+                  <CardTitle className="text-base">Vista previa</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Cost:</span>
+                      <span className="text-muted-foreground">Costo Total:</span>
                       <span className="font-medium">
                         ARS {totalCost / 100}
                       </span>
@@ -268,10 +267,10 @@ export function StockAdjustDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button type="submit" disabled={bulkUpsertStock.isPending}>
-              Save Stock
+              Guardar Stock
             </Button>
           </DialogFooter>
         </form>

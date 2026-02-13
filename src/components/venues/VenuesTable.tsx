@@ -31,6 +31,7 @@ interface VenuesTableProps {
   onEdit: (venue: Venue) => void;
   onDelete: (venue: Venue) => void;
   onView?: (venue: Venue) => void;
+  editingVenueId?: number | null;
 }
 
 function formatCapacity(capacity: number): string {
@@ -45,8 +46,8 @@ function VenueTypeBadge({ type }: { type: VenueType }) {
   };
 
   const labels = {
-    outdoor: 'Outdoor',
-    indoor: 'Indoor',
+    outdoor: 'Al aire libre',
+    indoor: 'Interior',
     nose: 'No especificado',
   };
 
@@ -63,18 +64,19 @@ export function VenuesTable({
   onEdit,
   onDelete,
   onView,
+  editingVenueId,
 }: VenuesTableProps) {
   if (isLoading) {
     return (
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>City</TableHead>
-            <TableHead>Country</TableHead>
-            <TableHead>Capacity</TableHead>
-            <TableHead>Address</TableHead>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Ciudad</TableHead>
+            <TableHead>País</TableHead>
+            <TableHead>Capacidad</TableHead>
+            <TableHead>Dirección</TableHead>
             <TableHead className="w-[70px]"></TableHead>
           </TableRow>
         </TableHeader>
@@ -113,12 +115,12 @@ export function VenuesTable({
     <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>City</TableHead>
-            <TableHead>Country</TableHead>
-            <TableHead>Capacity</TableHead>
-            <TableHead>Address</TableHead>
+            <TableHead>Nombre</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Ciudad</TableHead>
+            <TableHead>País</TableHead>
+            <TableHead>Capacidad</TableHead>
+            <TableHead>Dirección</TableHead>
             <TableHead className="w-[70px]"></TableHead>
           </TableRow>
         </TableHeader>
@@ -126,7 +128,7 @@ export function VenuesTable({
           {venues.length === 0 ? (
             <TableRow>
               <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                No venues found
+                No se encontraron sedes
               </TableCell>
             </TableRow>
           ) : (
@@ -165,26 +167,27 @@ export function VenuesTable({
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
                           <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Open menu</span>
+                          <span className="sr-only">Abrir menú</span>
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         {onView && (
                           <DropdownMenuItem onClick={() => onView(venue)}>
                             <Eye className="mr-2 h-4 w-4" />
-                            View
+                            Ver
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem onClick={() => onEdit(venue)}>
                           <Pencil className="mr-2 h-4 w-4" />
-                          Edit
+                          Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => onDelete(venue)}
                           className="text-destructive"
+                          disabled={editingVenueId === venue.id}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
+                          Eliminar
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

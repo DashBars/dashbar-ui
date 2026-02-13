@@ -72,18 +72,18 @@ export function SupplierFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Supplier' : 'New Supplier'}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Editar Proveedor' : 'Nuevo Proveedor'}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? 'Update supplier information.'
-              : 'Add a new supplier to your list.'}
+              ? 'Actualizá la información del proveedor.'
+              : 'Agregá un nuevo proveedor a tu lista.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="name">
-                Name <span className="text-destructive">*</span>
+                Nombre <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="name"
@@ -91,17 +91,17 @@ export function SupplierFormDialog({
                 onChange={(e) => setName(e.target.value)}
                 required
                 disabled={isSubmitting}
-                placeholder="Supplier name"
+                placeholder="Nombre del proveedor"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">Descripción</Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={isSubmitting}
-                placeholder="Optional description"
+                placeholder="Descripción opcional"
                 rows={3}
               />
             </div>
@@ -113,18 +113,18 @@ export function SupplierFormDialog({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isSubmitting}
-                placeholder="supplier@example.com"
+                placeholder="proveedor@ejemplo.com"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">Teléfono</Label>
               <Input
                 id="phone"
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 disabled={isSubmitting}
-                placeholder="+1 234 567 8900"
+                placeholder="+54 11 1234 5678"
               />
             </div>
           </div>
@@ -135,16 +135,16 @@ export function SupplierFormDialog({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isEdit ? 'Updating...' : 'Creating...'}
+                  {isEdit ? 'Actualizando...' : 'Creando...'}
                 </>
               ) : (
-                isEdit ? 'Update' : 'Create'
+                isEdit ? 'Actualizar' : 'Crear'
               )}
             </Button>
           </DialogFooter>

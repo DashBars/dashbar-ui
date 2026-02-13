@@ -59,12 +59,12 @@ export function ReceiptsTab({ eventId, barId }: ReceiptsTabProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Item</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Ownership</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Insumo</TableHead>
+                <TableHead>Proveedor</TableHead>
+                <TableHead>Cantidad</TableHead>
+                <TableHead>Propiedad</TableHead>
+                <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -100,7 +100,7 @@ export function ReceiptsTab({ eventId, barId }: ReceiptsTabProps) {
   return (
     <div className="space-y-4">
       <Input
-        placeholder="Search receipts..."
+          placeholder="Buscar comprobantes..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="max-w-sm"
@@ -110,19 +110,19 @@ export function ReceiptsTab({ eventId, barId }: ReceiptsTabProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Item</TableHead>
-              <TableHead>Supplier</TableHead>
-              <TableHead>Quantity</TableHead>
-              <TableHead>Ownership</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Insumo</TableHead>
+              <TableHead>Proveedor</TableHead>
+              <TableHead>Cantidad</TableHead>
+              <TableHead>Propiedad</TableHead>
+              <TableHead>Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {receipts.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                  No receipts found
+                  No se encontraron comprobantes
                 </TableCell>
               </TableRow>
             ) : (
@@ -134,18 +134,18 @@ export function ReceiptsTab({ eventId, barId }: ReceiptsTabProps) {
                   <TableCell>
                     <div>
                       <div className="font-medium">
-                        {movement.drink?.name || 'Unknown'}
+                        {movement.drink?.name || 'Desconocido'}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {movement.drink?.sku || '-'}
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>{movement.supplier?.name || 'Unknown'}</TableCell>
+                  <TableCell>{movement.supplier?.name || 'Desconocido'}</TableCell>
                   <TableCell>{movement.quantity}</TableCell>
                   <TableCell>
                     <Badge variant="outline">
-                      {movement.type === 'adjustment' ? 'Adjustment' : 'Receipt'}
+                      {movement.type === 'adjustment' ? 'Ajuste' : 'Comprobante'}
                     </Badge>
                   </TableCell>
                   <TableCell>

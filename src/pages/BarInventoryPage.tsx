@@ -73,34 +73,34 @@ export function BarInventoryPage() {
             </Button>
             <nav className="text-sm text-muted-foreground" aria-label="Breadcrumb">
               <Link to="/events" className="hover:text-foreground transition-colors">
-                Events
+                Eventos
               </Link>
               <span className="mx-2">/</span>
               <Link
                 to={`/events/${eventIdNum}`}
                 className="hover:text-foreground transition-colors"
               >
-                {event?.name || `Event ${eventIdNum}`}
+                {event?.name || `Evento ${eventIdNum}`}
               </Link>
               <span className="mx-2">/</span>
               <Link
                 to={`/events/${eventIdNum}/bars/${barIdNum}`}
                 className="hover:text-foreground transition-colors"
               >
-                {bar?.name || `Bar ${barIdNum}`}
+                {bar?.name || `Barra ${barIdNum}`}
               </Link>
               <span className="mx-2">/</span>
-              <span className="text-foreground font-medium">Inventory</span>
+              <span className="text-foreground font-medium">Inventario</span>
             </nav>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Bar Inventory</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Inventario de Barra</h1>
           <p className="text-muted-foreground mt-1">
-            Manage stock, receipts, and consignment returns
+            Gestioná stock, comprobantes y devoluciones de consignación
           </p>
         </div>
         <Button onClick={() => setReceiptDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Add stock
+          Agregar stock
         </Button>
       </div>
 
@@ -108,7 +108,7 @@ export function BarInventoryPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+            <CardTitle className="text-sm font-medium">Insumos Totales</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -117,14 +117,14 @@ export function BarInventoryPage() {
               <div className="text-2xl font-bold">{totalItems}</div>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              {totalQuantity} units total
+              {totalQuantity} unidades en total
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Valuation</CardTitle>
+            <CardTitle className="text-sm font-medium">Valuación Total</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -137,7 +137,7 @@ export function BarInventoryPage() {
                   </div>
                 ))}
                 {Object.keys(valuationByCurrency).length === 0 && (
-                  <div className="text-sm text-muted-foreground">No cost data</div>
+                  <div className="text-sm text-muted-foreground">Sin datos de costo</div>
                 )}
               </div>
             )}
@@ -146,7 +146,7 @@ export function BarInventoryPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Consignment Stock</CardTitle>
+            <CardTitle className="text-sm font-medium">Stock en Consignación</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -154,13 +154,13 @@ export function BarInventoryPage() {
             ) : (
               <div className="text-2xl font-bold">{consignmentCount}</div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">Items on consignment</p>
+            <p className="text-xs text-muted-foreground mt-1">Insumos en consignación</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Suppliers</CardTitle>
+            <CardTitle className="text-sm font-medium">Proveedores Activos</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -168,7 +168,7 @@ export function BarInventoryPage() {
             ) : (
               <div className="text-2xl font-bold">{uniqueSuppliers}</div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">Suppliers with stock</p>
+            <p className="text-xs text-muted-foreground mt-1">Proveedores con stock</p>
           </CardContent>
         </Card>
       </div>
@@ -176,9 +176,9 @@ export function BarInventoryPage() {
       {/* Tabs */}
       <Tabs defaultValue="on-hand" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="on-hand">On Hand</TabsTrigger>
-          <TabsTrigger value="receipts">Receipts</TabsTrigger>
-          <TabsTrigger value="consignment-returns">Consignment Returns</TabsTrigger>
+          <TabsTrigger value="on-hand">Disponible</TabsTrigger>
+          <TabsTrigger value="receipts">Comprobantes</TabsTrigger>
+          <TabsTrigger value="consignment-returns">Devoluciones</TabsTrigger>
         </TabsList>
 
         <TabsContent value="on-hand" className="space-y-4">

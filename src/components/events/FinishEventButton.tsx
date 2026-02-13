@@ -30,16 +30,15 @@ export function FinishEventButton({ event }: FinishEventButtonProps) {
     <>
       <Button onClick={() => setDialogOpen(true)} disabled={isPending} variant="outline">
         <Square className="mr-2 h-4 w-4" />
-        Finish Event
+        Finalizar Evento
       </Button>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Finish Event</DialogTitle>
+            <DialogTitle>Finalizar Evento</DialogTitle>
             <DialogDescription>
-              Are you sure you want to finish "{event.name}"? Once finished,
-              reports and analytics will be enabled for this event.
+              ¿Estás seguro de que querés finalizar "{event.name}"? Una vez finalizado, se habilitarán los reportes y análisis para este evento.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -48,10 +47,10 @@ export function FinishEventButton({ event }: FinishEventButtonProps) {
               onClick={() => setDialogOpen(false)}
               disabled={isPending}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button onClick={handleConfirm} disabled={isPending}>
-              {isPending ? 'Finishing...' : 'Finish Event'}
+              {isPending ? 'Finalizando...' : 'Finalizar Evento'}
             </Button>
           </DialogFooter>
         </DialogContent>

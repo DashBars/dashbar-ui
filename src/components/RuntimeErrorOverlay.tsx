@@ -24,7 +24,7 @@ export function RuntimeErrorOverlay() {
       const reason: any = event.reason;
       setErr({
         source: 'unhandledrejection',
-        message: reason?.message || String(reason) || 'Promise rejection',
+        message: reason?.message || String(reason) || 'Error de promesa',
         stack: reason?.stack,
       });
     };

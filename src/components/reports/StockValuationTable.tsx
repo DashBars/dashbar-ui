@@ -78,7 +78,7 @@ export function StockValuationTable({ data }: StockValuationTableProps) {
                   <TableHead className="text-right">Valor Total</TableHead>
                   <TableHead className="text-right">Comprado</TableHead>
                   <TableHead className="text-right">Consignación</TableHead>
-                  <TableHead className="text-right">Items</TableHead>
+                  <TableHead className="text-right">Insumos</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>

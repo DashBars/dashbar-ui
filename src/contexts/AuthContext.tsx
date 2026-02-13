@@ -57,13 +57,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(response.user);
       
       // Show success toast
-      toast.success('Logged in successfully');
+      toast.success('Sesión iniciada');
       
       // Redirect to previous location or default
       const redirectTo = new URLSearchParams(location.search).get('redirect') || '/events';
       navigate(redirectTo, { replace: true });
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Invalid credentials';
+      const errorMessage = error.response?.data?.message || error.message || 'Credenciales inválidas';
       toast.error(errorMessage);
       throw error;
     }
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(AUTH_TOKEN_KEY);
     setUser(null);
     navigate('/login', { replace: true });
-    toast.success('Logged out successfully');
+    toast.success('Sesión cerrada');
   };
 
   const hasRole = (role: UserRole): boolean => {

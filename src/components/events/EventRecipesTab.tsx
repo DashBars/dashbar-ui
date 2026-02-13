@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,21 +7,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Switch } from '@/components/ui/switch';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useEventRecipes, useCreateRecipe, useDeleteRecipe, useUpdateRecipe } from '@/hooks/useRecipes';
-import { useDrinks } from '@/hooks/useDrinks';
+import { useBars } from '@/hooks/useBars';
+import { useBarTypeDrinks } from '@/hooks/useStock';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { BarType, EventRecipe } from '@/lib/api/types';
 import { toast } from 'sonner';
-import { X, Plus, ChevronsUpDown, Check, GlassWater, Snowflake, Info } from 'lucide-react';
+import { X, Plus, Check, GlassWater, Snowflake, Info, Beaker, Pencil, ChevronRight, ChevronLeft, Layers, Store, AlertTriangle, Package, TrendingUp, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 interface EventRecipesTabProps {
   eventId: number;
   isEditable: boolean;
 }
+
+const ALL_BAR_TYPES: BarType[] = ['VIP', 'general', 'backstage', 'lounge'];
 
 const barTypeLabels: Record<BarType, string> = {
   VIP: 'VIP',
@@ -30,108 +30,53 @@ const barTypeLabels: Record<BarType, string> = {
   lounge: 'Lounge',
 };
 
-const ALL_BAR_TYPES: BarType[] = ['VIP', 'general', 'backstage', 'lounge'];
-
 export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
   const { data: recipes = [], isLoading } = useEventRecipes(eventId);
-  const { data: drinks = [], isLoading: isLoadingDrinks } = useDrinks();
-  // Removed global cocktails - only use recipe names from current event
+  const { data: bars = [] } = useBars(eventId);
   const createRecipe = useCreateRecipe(eventId);
   const deleteRecipe = useDeleteRecipe(eventId);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<EventRecipe | null>(null);
-  const [cocktailSelectorOpen, setCocktailSelectorOpen] = useState(false);
-  
-  // Form state
+  const [showCocktailSuggestions, setShowCocktailSuggestions] = useState(false);
+  const cocktailInputRef = useRef<HTMLInputElement>(null);
+  const cocktailSuggestionsRef = useRef<HTMLDivElement>(null);
+
+  // Stepper state (3 steps)
+  const [step, setStep] = useState(1);
+
+  // Step 1: Bar type + basic info
+  const [selectedBarType, setSelectedBarType] = useState<BarType | ''>('');
   const [cocktailName, setCocktailName] = useState('');
   const [glassVolume, setGlassVolume] = useState('');
-  const [isFinalProduct, setIsFinalProduct] = useState(false);
-  const [salePrice, setSalePrice] = useState('');
   const [hasIce, setHasIce] = useState(false);
-  const [selectedBarTypes, setSelectedBarTypes] = useState<BarType[]>([]);
+
+  // Step 2: Components
   const [components, setComponents] = useState<Array<{ drinkId: string; percentage: string }>>([]);
-  const [disabledBarTypes, setDisabledBarTypes] = useState<BarType[]>([]);
+
+  // Step 3: Price
+  const [salePrice, setSalePrice] = useState('');
 
   const updateRecipe = useUpdateRecipe(eventId, editingRecipe?.id || 0);
+
+  // Get recipe drinks aggregated across all bars of the selected type
+  const { data: barTypeDrinks = [], isLoading: isLoadingDrinks } = useBarTypeDrinks(
+    eventId,
+    selectedBarType,
+  );
+
+  // Derive which bar types actually exist in this event
+  const eventBarTypes = useMemo(() => {
+    const types = new Set<BarType>();
+    bars.forEach((b) => types.add(b.type));
+    return ALL_BAR_TYPES.filter((t) => types.has(t));
+  }, [bars]);
 
   // Get unique cocktail names from existing recipes in this event only
   const existingCocktailNames = useMemo(() => {
     const names = new Set<string>();
-    recipes.forEach(r => names.add(r.cocktailName));
+    recipes.forEach((r) => names.add(r.cocktailName));
     return Array.from(names).sort();
-  }, [recipes]);
-
-  // Generate a component signature for a recipe (sorted drink IDs)
-  const getComponentSignature = (recipe: EventRecipe): string => {
-    return recipe.components
-      .map(c => c.drinkId)
-      .sort((a, b) => a - b)
-      .join('-');
-  };
-
-  // Get a canonical name for a group of recipes based on their components
-  const getCanonicalName = (recipeNames: string[], _componentDrinkIds: number[]): string => {
-    // If all recipes have the same name, use it
-    const uniqueNames = [...new Set(recipeNames.map(n => n.toLowerCase().trim()))];
-    if (uniqueNames.length === 1) {
-      return recipeNames[0];
-    }
-    
-    // Otherwise, try to find the most common/shortest name or generate one from components
-    const sortedByLength = [...recipeNames].sort((a, b) => a.length - b.length);
-    return sortedByLength[0];
-  };
-
-  // Group recipes by component signature (same ingredients = same drink, different variants)
-  const groupedRecipes = useMemo(() => {
-    const groups = new Map<string, { 
-      displayName: string; 
-      alternateNames: string[];
-      recipes: EventRecipe[];
-      componentDrinkIds: number[];
-    }>();
-    
-    recipes.forEach(recipe => {
-      const signature = getComponentSignature(recipe);
-      const existing = groups.get(signature);
-      
-      if (existing) {
-        existing.recipes.push(recipe);
-        // Track alternate names
-        if (!existing.alternateNames.includes(recipe.cocktailName)) {
-          existing.alternateNames.push(recipe.cocktailName);
-        }
-        // Update display name to the canonical one
-        existing.displayName = getCanonicalName(
-          existing.alternateNames,
-          existing.componentDrinkIds
-        );
-      } else {
-        groups.set(signature, {
-          displayName: recipe.cocktailName,
-          alternateNames: [recipe.cocktailName],
-          recipes: [recipe],
-          componentDrinkIds: recipe.components.map(c => c.drinkId).sort((a, b) => a - b)
-        });
-      }
-    });
-    
-    return Array.from(groups.values()).map(g => {
-      // Calculate covered bar types across all variants
-      const coveredBarTypes = new Set<BarType>();
-      g.recipes.forEach(r => r.barTypes.forEach(bt => coveredBarTypes.add(bt)));
-      const allBarTypesCovered = ALL_BAR_TYPES.every(bt => coveredBarTypes.has(bt));
-      
-      return {
-        displayName: g.displayName,
-        alternateNames: g.alternateNames,
-        recipes: g.recipes,
-        hasMultipleNames: g.alternateNames.length > 1,
-        coveredBarTypes: Array.from(coveredBarTypes),
-        allBarTypesCovered,
-      };
-    });
   }, [recipes]);
 
   const formatPrice = (cents: number) => {
@@ -139,37 +84,29 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
   };
 
   const handleOpenDialog = (recipe?: EventRecipe) => {
+    setStep(1);
     if (recipe) {
       setEditingRecipe(recipe);
       setCocktailName(recipe.cocktailName);
       setGlassVolume(recipe.glassVolume.toString());
-      const hasPriceOrBarTypes = recipe.salePrice > 0 || recipe.barTypes.length > 0;
-      setIsFinalProduct(hasPriceOrBarTypes);
-      setSalePrice((recipe.salePrice / 100).toString());
+      setSalePrice(recipe.salePrice > 0 ? (recipe.salePrice / 100).toString() : '');
       setHasIce(recipe.hasIce);
-      setSelectedBarTypes([...recipe.barTypes]);
       setComponents(
         recipe.components.map((c) => ({
           drinkId: c.drinkId.toString(),
           percentage: c.percentage.toString(),
         })),
       );
-      // When editing, disable bar types used by OTHER variants of the same cocktail
-      const otherVariantsBarTypes = new Set<BarType>();
-      recipes
-        .filter(r => r.cocktailName === recipe.cocktailName && r.id !== recipe.id)
-        .forEach(r => r.barTypes.forEach(bt => otherVariantsBarTypes.add(bt)));
-      setDisabledBarTypes(Array.from(otherVariantsBarTypes));
+      // Pre-select the bar type from the recipe
+      setSelectedBarType(recipe.barTypes.length > 0 ? recipe.barTypes[0] : '');
     } else {
       setEditingRecipe(null);
       setCocktailName('');
       setGlassVolume('');
-      setIsFinalProduct(false);
       setSalePrice('');
       setHasIce(false);
-      setSelectedBarTypes([]);
+      setSelectedBarType('');
       setComponents([]);
-      setDisabledBarTypes([]); // No disabled bar types for new cocktail
     }
     setDialogOpen(true);
   };
@@ -188,31 +125,30 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
     setComponents(updated);
   };
 
-  const handleBarTypeToggle = (barType: BarType) => {
-    if (selectedBarTypes.includes(barType)) {
-      setSelectedBarTypes(selectedBarTypes.filter((bt) => bt !== barType));
-    } else {
-      setSelectedBarTypes([...selectedBarTypes, barType]);
-    }
-  };
+  // Check if bar type has enough recipe ingredients
+  const hasEnoughIngredients = barTypeDrinks.length >= 2;
 
-  const validateForm = (): string | null => {
+  // Validate step 1 (bar type + basic info)
+  const validateStep1 = (): string | null => {
+    if (!selectedBarType) {
+      return 'Selecciona un tipo de barra';
+    }
+    if (!hasEnoughIngredients) {
+      return `Las barras "${barTypeLabels[selectedBarType]}" necesitan al menos 2 insumos para recetas. Carga stock como "Para recetas" desde la tab Barras.`;
+    }
     if (!cocktailName.trim()) {
-      return 'El nombre del cocktail es requerido';
+      return 'El nombre del trago es requerido';
     }
     if (!glassVolume || parseInt(glassVolume, 10) <= 0) {
       return 'El volumen del vaso debe ser mayor a 0';
     }
-    if (isFinalProduct) {
-      if (!salePrice || parseFloat(salePrice) <= 0) {
-        return 'El precio de venta debe ser mayor a 0';
-      }
-      if (selectedBarTypes.length === 0) {
-        return 'Debes seleccionar al menos un tipo de barra';
-      }
-    }
+    return null;
+  };
+
+  // Validate step 2 (components)
+  const validateStep2 = (): string | null => {
     if (components.length < 2) {
-      return 'Las recetas requieren al menos 2 componentes. Para vender un insumo individual (ej: botella de agua), usá "Venta directa" al asignar stock.';
+      return 'Las recetas requieren al menos 2 componentes. Para vender un insumo individual, usa "Venta directa" al asignar stock.';
     }
     for (const component of components) {
       if (!component.drinkId || !component.percentage) {
@@ -223,30 +159,61 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
         return 'Los porcentajes deben estar entre 1 y 100';
       }
     }
-    const totalPercentage = components.reduce(
+    const totalPct = components.reduce(
       (sum, c) => sum + parseInt(c.percentage || '0', 10),
       0,
     );
-    if (totalPercentage > 100) {
-      return `La suma de porcentajes (${totalPercentage}%) no puede exceder 100%`;
+    if (totalPct > 100) {
+      return `La suma de porcentajes (${totalPct}%) no puede exceder 100%`;
     }
     return null;
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const error = validateForm();
-    if (error) {
-      toast.error(error);
-      return;
+  // Validate step 3 (price)
+  const validateStep3 = (): string | null => {
+    const price = parseFloat(salePrice || '0');
+    if (price <= 0) {
+      return 'El precio de venta debe ser mayor a 0';
     }
+    // Duplicate name + bar type check
+    if (!editingRecipe && selectedBarType) {
+      const existing = recipes.find(
+        (r) =>
+          r.cocktailName.toLowerCase() === cocktailName.trim().toLowerCase() &&
+          r.barTypes.includes(selectedBarType),
+      );
+      if (existing) {
+        return `Ya existe una receta "${cocktailName}" para barras ${barTypeLabels[selectedBarType]}`;
+      }
+    }
+    return null;
+  };
+
+  const handleNext = () => {
+    if (step === 1) {
+      const error = validateStep1();
+      if (error) { toast.error(error); return; }
+      setStep(2);
+    } else if (step === 2) {
+      const error = validateStep2();
+      if (error) { toast.error(error); return; }
+      setStep(3);
+    }
+  };
+
+  const handleSubmit = () => {
+    const error = validateStep3();
+    if (error) { toast.error(error); return; }
+
+    const price = parseFloat(salePrice || '0');
+    const barTypes: BarType[] = selectedBarType ? [selectedBarType] : [];
 
     const dto = {
       cocktailName: cocktailName.trim(),
       glassVolume: parseInt(glassVolume, 10),
-      salePrice: isFinalProduct ? Math.round(parseFloat(salePrice || '0') * 100) : 0,
+      salePrice: price > 0 ? Math.round(price * 100) : 0,
       hasIce,
-      barTypes: isFinalProduct ? selectedBarTypes : [],
+      barTypes: price > 0 ? barTypes : [],
       components: components.map((c) => ({
         drinkId: parseInt(c.drinkId, 10),
         percentage: parseInt(c.percentage, 10),
@@ -277,325 +244,500 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
   const volumeCalculations = useMemo(() => {
     const glass = parseInt(glassVolume || '0', 10);
     if (glass <= 0) return null;
-    
-    // Ice volume estimation based on glass size
-    // Standard glass (300-330ml): ~100ml ice
-    // Large glass (400-500ml): ~150-200ml ice
+
     let iceVolume: number;
     if (glass <= 250) {
-      iceVolume = Math.round(glass * 0.3); // ~30% for small glasses
+      iceVolume = Math.round(glass * 0.3);
     } else if (glass <= 350) {
-      iceVolume = Math.round(glass * 0.33); // ~33% for standard glasses
+      iceVolume = Math.round(glass * 0.33);
     } else {
-      iceVolume = Math.round(glass * 0.4); // ~40% for large glasses
+      iceVolume = Math.round(glass * 0.4);
     }
-    
+
     const liquidVolume = glass - iceVolume;
-    
-    return {
-      glassVolume: glass,
-      iceVolume,
-      liquidVolume,
-    };
+
+    return { glassVolume: glass, iceVolume, liquidVolume };
   }, [glassVolume]);
+
+  // Close cocktail suggestions on click outside
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (
+        cocktailSuggestionsRef.current &&
+        !cocktailSuggestionsRef.current.contains(e.target as Node) &&
+        cocktailInputRef.current &&
+        !cocktailInputRef.current.contains(e.target as Node)
+      ) {
+        setShowCocktailSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const filteredCocktailNames = useMemo(() => {
+    if (!cocktailName.trim()) return existingCocktailNames;
+    const q = cocktailName.toLowerCase();
+    return existingCocktailNames.filter((n) => n.toLowerCase().includes(q));
+  }, [cocktailName, existingCocktailNames]);
+
+  const isNewCocktailName =
+    cocktailName.trim() !== '' &&
+    !existingCocktailNames.some((n) => n.toLowerCase() === cocktailName.toLowerCase().trim());
+
+  // Calculate estimated cost of the recipe (in cents) from component costs
+  const estimatedCost = useMemo(() => {
+    if (components.length === 0 || barTypeDrinks.length === 0) return null;
+
+    const baseVolume =
+      hasIce && volumeCalculations
+        ? volumeCalculations.liquidVolume
+        : parseInt(glassVolume || '0', 10);
+
+    if (baseVolume <= 0) return null;
+
+    let totalCostCents = 0;
+    let allHaveCost = true;
+    const breakdown: { name: string; ml: number; costCents: number }[] = [];
+
+    for (const c of components) {
+      const drink = barTypeDrinks.find((d) => d.drinkId.toString() === c.drinkId);
+      if (!drink) continue;
+
+      const pct = parseInt(c.percentage || '0', 10);
+      const mlUsed = (baseVolume * pct) / 100;
+      const costPerMl = drink.costPerMl || 0;
+      const componentCost = costPerMl * mlUsed;
+
+      if (costPerMl <= 0) allHaveCost = false;
+
+      breakdown.push({
+        name: drink.name,
+        ml: Math.round(mlUsed),
+        costCents: componentCost,
+      });
+
+      totalCostCents += componentCost;
+    }
+
+    return { totalCostCents, breakdown, allHaveCost };
+  }, [components, barTypeDrinks, glassVolume, hasIce, volumeCalculations]);
+
+  // Filter state for recipe cards
+  const [cardFilter, setCardFilter] = useState<'all' | 'direct' | 'cocktail'>('all');
+
+  const individualRecipes = useMemo(() => {
+    if (cardFilter === 'all') return recipes;
+    return recipes.filter((r) => {
+      const isDirectSale = r.components.length === 1 && r.components[0].percentage === 100;
+      return cardFilter === 'direct' ? isDirectSale : !isDirectSale;
+    });
+  }, [recipes, cardFilter]);
 
   return (
     <div className="space-y-4">
-      <Card className="rounded-2xl">
-        <CardHeader className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-lg">Recetas de cocktails</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Define las recetas de cocktails con sus insumos y porcentajes. Los porcentajes representan la proporción 
-              del volumen líquido (si lleva hielo, se descuenta automáticamente del volumen del vaso).
-            </p>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Recetas y Productos</h2>
+          <p className="text-sm text-muted-foreground">
+            Defini las recetas de tragos usando los insumos cargados en las barras.
+          </p>
+        </div>
+        {isEditable && (
+          <Button onClick={() => handleOpenDialog()}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva receta
+          </Button>
+        )}
+      </div>
+
+      {/* Filter buttons */}
+      {!isLoading && recipes.length > 0 && (
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <div className="flex gap-1.5">
+            <Button
+              variant={cardFilter === 'all' ? 'default' : 'outline'}
+              size="sm"
+              className="h-7 text-xs px-3"
+              onClick={() => setCardFilter('all')}
+            >
+              Todos ({recipes.length})
+            </Button>
+            <Button
+              variant={cardFilter === 'cocktail' ? 'default' : 'outline'}
+              size="sm"
+              className="h-7 text-xs px-3 gap-1"
+              onClick={() => setCardFilter('cocktail')}
+            >
+              <Beaker className="h-3 w-3" />
+              Cocteles ({recipes.filter((r) => !(r.components.length === 1 && r.components[0].percentage === 100)).length})
+            </Button>
+            <Button
+              variant={cardFilter === 'direct' ? 'default' : 'outline'}
+              size="sm"
+              className="h-7 text-xs px-3 gap-1"
+              onClick={() => setCardFilter('direct')}
+            >
+              <Package className="h-3 w-3" />
+              Venta directa ({recipes.filter((r) => r.components.length === 1 && r.components[0].percentage === 100).length})
+            </Button>
           </div>
-          {isEditable && (
-            <Button onClick={() => handleOpenDialog()}>Agregar receta</Button>
-          )}
-        </CardHeader>
-        <CardContent>
-          {isLoading || isLoadingDrinks ? (
-            <div className="space-y-4">
-              <Skeleton className="h-6 w-40" />
-              <Skeleton className="h-64 w-full" />
-            </div>
-          ) : recipes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Todavía no hay recetas configuradas para este evento.
+        </div>
+      )}
+
+      {/* Recipe cards grid */}
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-48 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
+        </div>
+      ) : individualRecipes.length === 0 ? (
+        <Card className="rounded-2xl">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <GlassWater className="h-10 w-10 text-muted-foreground/50 mb-3" />
+            <p className="text-sm font-medium text-muted-foreground">
+              {cardFilter !== 'all'
+                ? `No hay ${cardFilter === 'direct' ? 'productos de venta directa' : 'cocteles'} configurados.`
+                : 'Todavia no hay recetas configuradas para este evento.'}
             </p>
-          ) : (
-            <div className="space-y-4">
-              {groupedRecipes.map((group) => {
-                const { displayName, alternateNames, recipes: variants, hasMultipleNames, allBarTypesCovered } = group;
-                
-                // Get all unique components across all variants
-                const allDrinkIds = new Set<number>();
-                variants.forEach(v => v.components.forEach(c => allDrinkIds.add(c.drinkId)));
-                const componentDrinks = Array.from(allDrinkIds);
-                
-                return (
-                  <div key={displayName} className="rounded-xl border bg-card overflow-hidden">
-                    {/* Cocktail Header */}
-                    <div className="border-b bg-muted/30 px-4 py-3 flex items-center justify-between">
-                      <div className="flex flex-col gap-1">
-                        <h3 className="font-semibold text-base flex items-center gap-2">
-                          <GlassWater className="h-4 w-4 text-primary" />
-                          {displayName}
-                          <Badge variant="secondary" className="ml-2 font-normal">
-                            {variants.length} {variants.length === 1 ? 'variante' : 'variantes'}
-                          </Badge>
-                        </h3>
-                        {hasMultipleNames && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <span>También conocido como:</span>
-                            {alternateNames
-                              .filter(n => n !== displayName)
-                              .map((name) => (
-                                <Badge key={name} variant="outline" className="text-xs font-normal">
-                                  {name}
-                                </Badge>
-                              ))}
-                          </p>
-                        )}
-                      </div>
-                      {isEditable && (
-                        allBarTypesCovered ? (
-                          <Badge variant="secondary" className="text-xs font-normal">
-                            <Check className="h-3 w-3 mr-1" />
-                            Todos los tipos de barra configurados
-                          </Badge>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              // Pre-fill with cocktail name for new variant
-                              setEditingRecipe(null);
-                              setCocktailName(displayName);
-                              setGlassVolume('');
-                              setIsFinalProduct(true);
-                              // Pre-fill price from first variant for auto-merge to work
-                              setSalePrice(variants[0]?.salePrice ? (variants[0].salePrice / 100).toString() : '');
-                              setHasIce(variants[0]?.hasIce || false);
-                              setSelectedBarTypes([]);
-                              // Disable bar types already used by other variants
-                              const usedBarTypes = new Set<BarType>();
-                              variants.forEach(v => v.barTypes.forEach(bt => usedBarTypes.add(bt)));
-                              setDisabledBarTypes(Array.from(usedBarTypes));
-                              // Copy components from first variant as template
-                              if (variants[0]) {
-                                setComponents(
-                                  variants[0].components.map((c) => ({
-                                    drinkId: c.drinkId.toString(),
-                                    percentage: c.percentage.toString(),
-                                  }))
-                                );
-                              } else {
-                                setComponents([]);
-                              }
-                              setDialogOpen(true);
-                            }}
-                          >
-                            <Plus className="h-3.5 w-3.5 mr-1" />
-                            Nueva variante
-                          </Button>
-                        )
+            {isEditable && cardFilter === 'all' && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Carga stock a las barras primero y luego crea recetas con esos insumos.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {individualRecipes.map((recipe) => {
+            const totalPerc = recipe.components.reduce((sum, c) => sum + c.percentage, 0);
+            const isForSale = recipe.salePrice > 0;
+            const isDirectSale = recipe.components.length === 1 && recipe.components[0].percentage === 100;
+
+            return (
+              <Card key={recipe.id} className="rounded-xl flex flex-col">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {isDirectSale ? (
+                        <div className="h-6 w-6 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center shrink-0">
+                          <Package className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                        </div>
+                      ) : (
+                        <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center shrink-0">
+                          <Beaker className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                      )}
+                      <CardTitle className="text-base truncate">{recipe.cocktailName}</CardTitle>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isForSale && (
+                        <Badge variant="default" className="gap-1">
+                          {formatPrice(recipe.salePrice)}
+                        </Badge>
                       )}
                     </div>
-                    
-                    {/* Comparison Table */}
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b bg-muted/20">
-                            <th className="text-left font-medium px-4 py-2 text-muted-foreground">Barras</th>
-                            <th className="text-center font-medium px-3 py-2 text-muted-foreground w-20">Vaso</th>
-                            <th className="text-center font-medium px-3 py-2 text-muted-foreground w-20">Hielo</th>
-                            <th className="text-right font-medium px-3 py-2 text-muted-foreground w-24">Precio</th>
-                            {/* Component columns */}
-                            {componentDrinks.map(drinkId => {
-                              const drink = drinks.find(d => d.id === drinkId);
-                              return (
-                                <th key={drinkId} className="text-center font-medium px-3 py-2 text-muted-foreground min-w-[80px]">
-                                  <div className="flex flex-col items-center">
-                                    <span className="truncate max-w-[100px]" title={drink?.name}>
-                                      {drink?.name || `#${drinkId}`}
-                                    </span>
-                                    <span className="text-xs font-normal opacity-70">{drink?.brand}</span>
-                                  </div>
-                                </th>
-                              );
-                            })}
-                            {isEditable && <th className="w-24"></th>}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {variants.map((recipe) => (
-                            <tr key={recipe.id} className="hover:bg-muted/30 transition-colors">
-                              {/* Bar types */}
-                              <td className="px-4 py-3">
-                                <div className="flex flex-wrap gap-1">
-                                  {recipe.barTypes.length > 0 ? (
-                                    recipe.barTypes.map((bt) => (
-                                      <Badge key={bt} variant="default" className="text-xs">
-                                        {barTypeLabels[bt]}
-                                      </Badge>
-                                    ))
-                                  ) : (
-                                    <Badge variant="outline" className="text-xs text-muted-foreground">
-                                      Sin asignar
-                                    </Badge>
-                                  )}
-                                </div>
-                              </td>
-                              {/* Glass volume */}
-                              <td className="text-center px-3 py-3">
-                                <span className="font-medium">{recipe.glassVolume}</span>
-                                <span className="text-muted-foreground text-xs ml-0.5">ml</span>
-                              </td>
-                              {/* Ice */}
-                              <td className="text-center px-3 py-3">
-                                {recipe.hasIce ? (
-                                  <Snowflake className="h-4 w-4 text-blue-500 mx-auto" />
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </td>
-                              {/* Price */}
-                              <td className="text-right px-3 py-3 font-medium">
-                                {formatPrice(recipe.salePrice)}
-                              </td>
-                              {/* Component percentages */}
-                              {componentDrinks.map(drinkId => {
-                                const component = recipe.components.find(c => c.drinkId === drinkId);
-                                return (
-                                  <td key={drinkId} className="text-center px-3 py-3">
-                                    {component ? (
-                                      <span className="inline-flex items-center justify-center bg-primary/10 text-primary font-semibold rounded px-2 py-0.5 min-w-[40px]">
-                                        {component.percentage}%
-                                      </span>
-                                    ) : (
-                                      <span className="text-muted-foreground">—</span>
-                                    )}
-                                  </td>
-                                );
-                              })}
-                              {/* Actions */}
-                              {isEditable && (
-                                <td className="px-3 py-3">
-                                  <div className="flex gap-1 justify-end">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2"
-                                      onClick={() => handleOpenDialog(recipe)}
-                                    >
-                                      Editar
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2 text-destructive hover:text-destructive"
-                                      onClick={() => deleteRecipe.mutate(recipe.id)}
-                                    >
-                                      <X className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                </td>
-                              )}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        'text-xs py-0 font-normal',
+                        isDirectSale
+                          ? 'bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300'
+                          : 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300',
+                      )}
+                    >
+                      {isDirectSale ? 'Venta directa' : 'Coctel'}
+                    </Badge>
+                    <span className="flex items-center gap-1">
+                      <GlassWater className="h-3.5 w-3.5" />
+                      {recipe.glassVolume}ml
+                    </span>
+                    {recipe.hasIce && (
+                      <span className="flex items-center gap-1">
+                        <Snowflake className="h-3.5 w-3.5 text-blue-500" />
+                        Con hielo
+                      </span>
+                    )}
+                    {!isDirectSale && (
+                      <span className="flex items-center gap-1">
+                        <Beaker className="h-3.5 w-3.5" />
+                        {recipe.components.length} insumos
+                      </span>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0 flex-1 flex flex-col">
+                  {/* Components with progress bars */}
+                  <div className="space-y-1.5">
+                    {recipe.components.map((component) => (
+                      <div
+                        key={component.id}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="text-muted-foreground truncate mr-2">
+                          {component.drink?.name || 'Insumo desconocido'}
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className={cn(
+                                'h-full rounded-full',
+                                isDirectSale ? 'bg-green-500/60' : 'bg-primary/60',
+                              )}
+                              style={{ width: `${component.percentage}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium w-8 text-right">
+                            {component.percentage}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {totalPerc < 100 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground italic">Resto (hielo, agua, etc.)</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-muted-foreground/20"
+                              style={{ width: `${100 - totalPerc}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium w-8 text-right text-muted-foreground">
+                            {100 - totalPerc}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
+                  {/* Bar types */}
+                  {recipe.barTypes.length > 0 && (
+                    <div className="flex items-center gap-1.5 mt-auto pt-3 border-t mt-3">
+                      <span className="text-xs text-muted-foreground">Barras:</span>
+                      {recipe.barTypes.map((bt) => (
+                        <Badge key={bt} variant="outline" className="text-xs py-0">
+                          {barTypeLabels[bt]}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  {isEditable && (
+                    <div className="flex justify-end gap-1 mt-3 pt-2 border-t">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={() => handleOpenDialog(recipe)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-destructive hover:text-destructive"
+                        onClick={() => deleteRecipe.mutate(recipe.id)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Stepper Dialog — 3 steps */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <form onSubmit={handleSubmit}>
-            <DialogHeader>
-              <DialogTitle>{editingRecipe ? 'Editar receta' : 'Nueva receta'}</DialogTitle>
-              <DialogDescription>
-                Define el nombre del cocktail, volumen del vaso y componentes. Si es producto final, podrás asignar precio y tipos de barra.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
+          <DialogHeader>
+            <DialogTitle>{editingRecipe ? 'Editar receta' : 'Nueva receta'}</DialogTitle>
+            <DialogDescription>
+              {step === 1 && 'Paso 1 de 3 — Tipo de barra, nombre del trago y volumen del vaso.'}
+              {step === 2 && 'Paso 2 de 3 — Agrega los componentes usando los insumos de las barras.'}
+              {step === 3 && 'Paso 3 de 3 — Configura el precio de venta.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Stepper indicator */}
+          <div className="flex items-center gap-2 mb-2">
+            <div
+              className={cn(
+                'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                step >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+              )}
+            >
+              <Store className="h-3.5 w-3.5" />
+              Tipo de barra
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <div
+              className={cn(
+                'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                step >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+              )}
+            >
+              <Beaker className="h-3.5 w-3.5" />
+              Componentes
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <div
+              className={cn(
+                'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                step >= 3 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+              )}
+            >
+              <Layers className="h-3.5 w-3.5" />
+              Precio
+            </div>
+          </div>
+
+          {/* Step 1: Bar type + basic info */}
+          {step === 1 && (
+            <div className="space-y-4">
               <div className="grid gap-2">
-                <Label htmlFor="cocktailName">Nombre del cocktail</Label>
-                <Popover open={cocktailSelectorOpen} onOpenChange={setCocktailSelectorOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={cocktailSelectorOpen}
-                      className="w-full justify-between font-normal"
-                    >
-                      {cocktailName || "Seleccionar o escribir nombre..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
-                    <Command>
-                      <CommandInput 
-                        placeholder="Buscar o crear cocktail..." 
-                        value={cocktailName}
-                        onValueChange={setCocktailName}
-                      />
-                      <CommandList>
-                        {cocktailName && !existingCocktailNames.some(n => n.toLowerCase() === cocktailName.toLowerCase()) && (
-                          <CommandGroup heading="Crear nuevo">
-                            <CommandItem
-                              value={cocktailName}
-                              onSelect={() => {
-                                setCocktailSelectorOpen(false);
-                              }}
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              Crear "{cocktailName}"
-                            </CommandItem>
-                          </CommandGroup>
-                        )}
-                        {existingCocktailNames.length > 0 && (
-                          <CommandGroup heading="Cocktails existentes">
-                            {existingCocktailNames
-                              .filter(name => name.toLowerCase().includes(cocktailName.toLowerCase()))
-                              .map((name) => (
-                                <CommandItem
-                                  key={name}
-                                  value={name}
-                                  onSelect={(value) => {
-                                    setCocktailName(value);
-                                    setCocktailSelectorOpen(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      cocktailName === name ? "opacity-100" : "opacity-0"
-                                    )}
-                                  />
-                                  {name}
-                                </CommandItem>
-                              ))}
-                          </CommandGroup>
-                        )}
-                        <CommandEmpty>
-                          {cocktailName ? `Presiona Enter para crear "${cocktailName}"` : "Escribe para buscar o crear"}
-                        </CommandEmpty>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                <p className="text-xs text-muted-foreground">
-                  Selecciona un cocktail existente para crear una variante, o escribe un nuevo nombre
-                </p>
+                <Label>
+                  Tipo de barra <span className="text-destructive">*</span>
+                </Label>
+                {eventBarTypes.length === 0 ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        No hay barras creadas en este evento. Crea barras primero desde la tab "Barras".
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {eventBarTypes.map((bt) => {
+                      const barsOfType = bars.filter((b) => b.type === bt);
+                      const isSelected = selectedBarType === bt;
+                      return (
+                        <button
+                          key={bt}
+                          type="button"
+                          onClick={() => {
+                            setSelectedBarType(bt);
+                            // Reset components when bar type changes
+                            setComponents([]);
+                          }}
+                          className={cn(
+                            'flex items-center gap-3 p-3 rounded-lg border text-left transition-all',
+                            isSelected
+                              ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                              : 'hover:bg-muted/50',
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              'h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0',
+                              isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                            )}
+                          >
+                            {barTypeLabels[bt].charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{barTypeLabels[bt]}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {barsOfType.length} barra{barsOfType.length !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                          {isSelected && <Check className="h-4 w-4 text-primary ml-auto" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {selectedBarType && (
+                  <p className="text-xs text-muted-foreground">
+                    La receta se asignara a todas las barras de tipo "{barTypeLabels[selectedBarType]}"
+                  </p>
+                )}
+              </div>
+
+              {/* Ingredient availability warning */}
+              {selectedBarType && !isLoadingDrinks && !hasEnoughIngredients && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                    <div className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
+                      <p className="font-medium">
+                        Se necesitan al menos 2 insumos para recetas
+                      </p>
+                      <p>
+                        Las barras de tipo "{barTypeLabels[selectedBarType]}" tienen {barTypeDrinks.length} insumo{barTypeDrinks.length !== 1 ? 's' : ''} para recetas.
+                        Carga mas stock como "Para recetas" desde la tab "Barras" usando "Cargar Stock a Barras".
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedBarType && !isLoadingDrinks && hasEnoughIngredients && (
+                <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-900 p-2 px-3">
+                  <p className="text-xs text-green-700 dark:text-green-300 flex items-center gap-1.5">
+                    <Check className="h-3.5 w-3.5" />
+                    {barTypeDrinks.length} insumos disponibles para recetas
+                  </p>
+                </div>
+              )}
+
+              <div className="grid gap-2 relative">
+                <Label htmlFor="cocktailName">Nombre del trago</Label>
+                <Input
+                  ref={cocktailInputRef}
+                  id="cocktailName"
+                  value={cocktailName}
+                  onChange={(e) => {
+                    setCocktailName(e.target.value);
+                    setShowCocktailSuggestions(true);
+                  }}
+                  onFocus={() => setShowCocktailSuggestions(true)}
+                  placeholder="Buscar o crear trago..."
+                  autoComplete="off"
+                />
+                {showCocktailSuggestions && (filteredCocktailNames.length > 0 || isNewCocktailName) && (
+                  <div
+                    ref={cocktailSuggestionsRef}
+                    className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border bg-popover shadow-md max-h-48 overflow-y-auto"
+                  >
+                    {filteredCocktailNames.map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-accent transition-colors flex items-center gap-2 text-sm"
+                        onClick={() => {
+                          setCocktailName(n);
+                          setShowCocktailSuggestions(false);
+                        }}
+                      >
+                        <Check className={cn('h-3.5 w-3.5 shrink-0', cocktailName === n ? 'opacity-100' : 'opacity-0')} />
+                        <span>{n}</span>
+                        <Badge variant="secondary" className="ml-auto text-xs font-normal">existente</Badge>
+                      </button>
+                    ))}
+                    {isNewCocktailName && (
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-accent transition-colors flex items-center gap-2 text-sm border-t"
+                        onClick={() => setShowCocktailSuggestions(false)}
+                      >
+                        <Plus className="h-3.5 w-3.5 shrink-0" />
+                        <span>Crear "<strong>{cocktailName}</strong>"</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-2">
@@ -610,7 +752,7 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
                   placeholder="Ej: 350"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Capacidad total del vaso. Ejemplos: vaso estándar 300-330ml, highball 400-500ml
+                  Capacidad total del vaso. Ejemplos: vaso estandar 300-330ml, highball 400-500ml
                 </p>
               </div>
 
@@ -626,115 +768,52 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
                     Lleva hielo
                   </Label>
                 </div>
-                
-                {/* Ice volume helper */}
+
                 {hasIce && volumeCalculations && (
                   <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-900 p-3 space-y-2">
                     <div className="flex items-start gap-2">
                       <Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
                       <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-                        <p className="font-medium">Cálculo de volumen con hielo</p>
+                        <p className="font-medium">Calculo de volumen con hielo</p>
                         <p>
-                          El hielo ocupa aproximadamente <span className="font-semibold">{volumeCalculations.iceVolume}ml</span> del 
-                          vaso, dejando <span className="font-semibold">{volumeCalculations.liquidVolume}ml</span> para líquido.
-                        </p>
-                        <p className="text-blue-600 dark:text-blue-400">
-                          Los porcentajes de los componentes deben sumar hasta 100% del <span className="font-semibold">volumen líquido</span> ({volumeCalculations.liquidVolume}ml), no del vaso completo.
+                          El hielo ocupa aproximadamente <span className="font-semibold">{volumeCalculations.iceVolume}ml</span> del
+                          vaso, dejando <span className="font-semibold">{volumeCalculations.liquidVolume}ml</span> para liquido.
                         </p>
                       </div>
                     </div>
-                    
-                    {/* Visual breakdown */}
+
                     <div className="flex items-center gap-2 mt-2">
                       <div className="flex-1 h-6 rounded-md overflow-hidden flex text-xs font-medium">
-                        <div 
+                        <div
                           className="bg-blue-200 dark:bg-blue-800 flex items-center justify-center text-blue-700 dark:text-blue-200"
                           style={{ width: `${(volumeCalculations.iceVolume / volumeCalculations.glassVolume) * 100}%` }}
                         >
                           Hielo
                         </div>
-                        <div 
+                        <div
                           className="bg-primary/20 flex items-center justify-center text-primary"
                           style={{ width: `${(volumeCalculations.liquidVolume / volumeCalculations.glassVolume) * 100}%` }}
                         >
-                          Líquido
+                          Liquido
                         </div>
                       </div>
                       <span className="text-xs text-muted-foreground w-16 text-right">{volumeCalculations.glassVolume}ml</span>
                     </div>
                   </div>
                 )}
-                
-                {!hasIce && glassVolume && (
-                  <p className="text-xs text-muted-foreground">
-                    Sin hielo, todo el volumen del vaso ({glassVolume}ml) es para líquido
-                  </p>
-                )}
               </div>
+            </div>
+          )}
 
-              <div className="flex items-center justify-between rounded-xl border bg-muted/30 px-4 py-3">
-                <div>
-                  <Label htmlFor="isFinalProduct" className="cursor-pointer text-sm font-medium">
-                    Es producto final
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Asignar precio y tipos de barra para venta
-                  </p>
-                </div>
-                <Switch
-                  id="isFinalProduct"
-                  checked={isFinalProduct}
-                  onCheckedChange={(checked) => setIsFinalProduct(checked === true)}
-                />
+          {/* Step 2: Components (from bar type stock) */}
+          {step === 2 && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="text-sm font-medium">{cocktailName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {glassVolume}ml{hasIce ? ' · Con hielo' : ''} · Barras {selectedBarType ? barTypeLabels[selectedBarType] : ''}
+                </p>
               </div>
-
-              {isFinalProduct && (
-                <>
-                  <div className="grid gap-2">
-                    <Label htmlFor="salePrice">Precio de venta ($)</Label>
-                    <Input
-                      id="salePrice"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={salePrice}
-                      onChange={(e) => setSalePrice(e.target.value)}
-                      required={isFinalProduct}
-                      placeholder="Ej: 50.00"
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label>Tipos de barra</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {(['VIP', 'general', 'backstage', 'lounge'] as BarType[]).map((barType) => {
-                        const isDisabled = disabledBarTypes.includes(barType);
-                        return (
-                          <Button
-                            key={barType}
-                            type="button"
-                            variant={selectedBarTypes.includes(barType) ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => handleBarTypeToggle(barType)}
-                            disabled={isDisabled}
-                            title={isDisabled ? 'Ya existe una variante para este tipo de barra' : undefined}
-                          >
-                            {barTypeLabels[barType]}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                    {selectedBarTypes.length === 0 && (
-                      <p className="text-xs text-destructive">Selecciona al menos un tipo de barra</p>
-                    )}
-                    {disabledBarTypes.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Los tipos de barra deshabilitados ya tienen una variante configurada
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
 
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
@@ -744,29 +823,47 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
                     variant="outline"
                     size="sm"
                     onClick={handleAddComponent}
+                    disabled={barTypeDrinks.length === 0 || totalPercentage >= 100}
                   >
                     <Plus className="h-4 w-4 mr-1" />
-                    Agregar componente
+                    Agregar
                   </Button>
                 </div>
+
+                {totalPercentage >= 100 && components.length > 0 && (
+                  <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-900 p-2 px-3">
+                    <p className="text-xs text-green-700 dark:text-green-300 flex items-center gap-1.5">
+                      <Check className="h-3.5 w-3.5" />
+                      Composicion completa al {totalPercentage}% — no se pueden agregar mas componentes
+                    </p>
+                  </div>
+                )}
+
                 {components.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    Agrega al menos un componente con su porcentaje
+                    Agrega al menos 2 componentes con su porcentaje
                   </p>
                 ) : (
                   <div className="space-y-2">
                     {components.map((component, index) => {
                       const percentage = parseInt(component.percentage || '0', 10);
-                      const baseVolume = hasIce && volumeCalculations 
-                        ? volumeCalculations.liquidVolume 
-                        : parseInt(glassVolume || '0', 10);
-                      const mlValue = baseVolume > 0 && percentage > 0 
-                        ? Math.round((baseVolume * percentage) / 100) 
-                        : 0;
-                      
+                      const baseVolume =
+                        hasIce && volumeCalculations
+                          ? volumeCalculations.liquidVolume
+                          : parseInt(glassVolume || '0', 10);
+                      const mlValue =
+                        baseVolume > 0 && percentage > 0
+                          ? Math.round((baseVolume * percentage) / 100)
+                          : 0;
+
+                      // Find selected drink to show stock info
+                      const selectedDrink = barTypeDrinks.find(
+                        (d) => d.drinkId.toString() === component.drinkId,
+                      );
+
                       return (
                         <div key={index} className="flex gap-2 items-start">
-                          <div className="flex-1 grid gap-2">
+                          <div className="flex-1 grid gap-1">
                             <Select
                               value={component.drinkId}
                               onValueChange={(value) =>
@@ -777,23 +874,41 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
                                 <SelectValue placeholder="Seleccionar insumo" />
                               </SelectTrigger>
                               <SelectContent>
-                                {drinks.map((drink) => (
-                                  <SelectItem key={drink.id} value={drink.id.toString()}>
-                                    {drink.name} - {drink.brand}
-                                  </SelectItem>
-                                ))}
+                                {isLoadingDrinks ? (
+                                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                                    Cargando insumos...
+                                  </div>
+                                ) : (
+                                  barTypeDrinks.map((drink) => (
+                                    <SelectItem key={drink.drinkId} value={drink.drinkId.toString()}>
+                                      {drink.name} - {drink.brand} ({drink.unitCount} un.)
+                                    </SelectItem>
+                                  ))
+                                )}
                               </SelectContent>
                             </Select>
+                            {selectedDrink && (
+                              <p className="text-xs text-muted-foreground pl-1">
+                                Stock: {selectedDrink.unitCount} unidades ({(selectedDrink.totalMl / 1000).toFixed(1)}L)
+                              </p>
+                            )}
                           </div>
                           <div className="w-24">
                             <Input
                               type="number"
                               min="1"
-                              max="100"
+                              max={100 - (totalPercentage - parseInt(component.percentage || '0', 10))}
                               value={component.percentage}
-                              onChange={(e) =>
-                                handleComponentChange(index, 'percentage', e.target.value)
-                              }
+                              onChange={(e) => {
+                                const othersTotal = totalPercentage - parseInt(component.percentage || '0', 10);
+                                const maxAllowed = 100 - othersTotal;
+                                const val = parseInt(e.target.value || '0', 10);
+                                if (val > maxAllowed) {
+                                  handleComponentChange(index, 'percentage', maxAllowed.toString());
+                                } else {
+                                  handleComponentChange(index, 'percentage', e.target.value);
+                                }
+                              }}
                               placeholder="%"
                             />
                           </div>
@@ -813,26 +928,25 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
                         </div>
                       );
                     })}
-                    
+
                     {/* Summary */}
                     <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Total porcentaje:</span>
-                        <span className={cn("font-medium", totalPercentage > 100 && "text-destructive")}>
+                        <span className={cn('font-medium', totalPercentage > 100 && 'text-destructive')}>
                           {totalPercentage}%
                           {totalPercentage > 100 && ' (excede 100%)'}
                         </span>
                       </div>
                       {glassVolume && (
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            Volumen líquido total:
-                          </span>
+                          <span className="text-muted-foreground">Volumen liquido total:</span>
                           <span className="font-medium">
                             {(() => {
-                              const baseVolume = hasIce && volumeCalculations 
-                                ? volumeCalculations.liquidVolume 
-                                : parseInt(glassVolume || '0', 10);
+                              const baseVolume =
+                                hasIce && volumeCalculations
+                                  ? volumeCalculations.liquidVolume
+                                  : parseInt(glassVolume || '0', 10);
                               const totalMl = Math.round((baseVolume * totalPercentage) / 100);
                               return `${totalMl}ml de ${baseVolume}ml`;
                             })()}
@@ -849,18 +963,153 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
                 )}
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                disabled={!isEditable || createRecipe.isPending || updateRecipe.isPending}
-              >
-                {editingRecipe ? 'Actualizar' : 'Guardar'}
-              </Button>
-            </DialogFooter>
-          </form>
+          )}
+
+          {/* Step 3: Price */}
+          {step === 3 && (
+            <div className="space-y-4">
+              {/* Recipe summary */}
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                <p className="text-sm font-medium">{cocktailName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {glassVolume}ml · {components.length} componentes{hasIce ? ' · Con hielo' : ''} · Barras {selectedBarType ? barTypeLabels[selectedBarType] : ''}
+                </p>
+                <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
+                  {components.map((c, i) => {
+                    const drink = barTypeDrinks.find((d) => d.drinkId.toString() === c.drinkId);
+                    return (
+                      <div key={i} className="flex justify-between">
+                        <span>{drink?.name || 'Insumo'}</span>
+                        <span>{c.percentage}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Estimated cost breakdown */}
+              {estimatedCost && estimatedCost.totalCostCents > 0 && (
+                <div className="rounded-lg border p-3 space-y-2">
+                  <p className="text-xs font-medium flex items-center gap-1.5">
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    Costo estimado del trago
+                  </p>
+                  <div className="space-y-1">
+                    {estimatedCost.breakdown.map((item, i) => (
+                      <div key={i} className="flex justify-between text-xs text-muted-foreground">
+                        <span>{item.name} ({item.ml}ml)</span>
+                        <span>${(item.costCents / 100).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between text-sm font-medium pt-1.5 border-t">
+                    <span>Costo total</span>
+                    <span>${(estimatedCost.totalCostCents / 100).toFixed(2)}</span>
+                  </div>
+                  {!estimatedCost.allHaveCost && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Algunos insumos no tienen costo cargado. El calculo es aproximado.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="grid gap-2">
+                <Label htmlFor="salePrice">
+                  Precio de venta ($) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="salePrice"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={salePrice}
+                  onChange={(e) => setSalePrice(e.target.value)}
+                  placeholder="Ej: 50.00"
+                />
+              </div>
+
+              {/* Profit margin */}
+              {estimatedCost && estimatedCost.totalCostCents > 0 && parseFloat(salePrice || '0') > 0 && (
+                (() => {
+                  const costPesos = estimatedCost.totalCostCents / 100;
+                  const salePriceNum = parseFloat(salePrice);
+                  const profit = salePriceNum - costPesos;
+                  const marginPct = costPesos > 0 ? ((profit) / costPesos) * 100 : 0;
+                  const isPositive = profit > 0;
+                  return (
+                    <div
+                      className={cn(
+                        'flex items-center justify-between text-sm rounded-lg px-3 py-2',
+                        isPositive
+                          ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300'
+                          : 'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300',
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className={cn('h-4 w-4', !isPositive && 'rotate-180')} />
+                        <span>Margen de ganancia:</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-semibold">{marginPct.toFixed(1)}%</span>
+                        <span className="text-xs ml-1">(${profit.toFixed(2)}/trago)</span>
+                      </div>
+                    </div>
+                  );
+                })()
+              )}
+
+              {selectedBarType && (
+                <div className="flex items-start gap-3 rounded-lg border bg-muted/50 p-3">
+                  <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground">
+                    Esta receta se asignara a todas las barras de tipo <strong>{barTypeLabels[selectedBarType]}</strong> en este evento.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            {step === 1 && (
+              <>
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={handleNext} disabled={!selectedBarType || !hasEnoughIngredients}>
+                  Siguiente
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </>
+            )}
+            {step === 2 && (
+              <>
+                <Button type="button" variant="outline" onClick={() => setStep(1)}>
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Volver
+                </Button>
+                <Button type="button" onClick={handleNext}>
+                  Siguiente
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </>
+            )}
+            {step === 3 && (
+              <>
+                <Button type="button" variant="outline" onClick={() => setStep(2)}>
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Volver
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={!isEditable || createRecipe.isPending || updateRecipe.isPending}
+                >
+                  {editingRecipe ? 'Actualizar' : 'Guardar receta'}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -43,10 +43,10 @@ export function useCreateBar(eventId: number) {
     mutationFn: (dto: CreateBarDto) => barsApi.createBar(eventId, dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: barsKeys.list(eventId) });
-      toast.success('Bar creado exitosamente');
+      toast.success('Barra creada exitosamente');
     },
     onError: (error: Error) => {
-      toast.error(`Error al crear bar: ${error.message}`);
+      toast.error(`Error al crear barra: ${error.message}`);
     },
   });
 }
@@ -62,10 +62,10 @@ export function useUpdateBar(eventId: number, barId: number) {
       queryClient.invalidateQueries({
         queryKey: barsKeys.detail(eventId, barId),
       });
-      toast.success('Bar actualizado exitosamente');
+      toast.success('Barra actualizada exitosamente');
     },
     onError: (error: Error) => {
-      toast.error(`Error al actualizar bar: ${error.message}`);
+      toast.error(`Error al actualizar barra: ${error.message}`);
     },
   });
 }
@@ -77,10 +77,10 @@ export function useDeleteBar(eventId: number) {
     mutationFn: (barId: number) => barsApi.deleteBar(eventId, barId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: barsKeys.list(eventId) });
-      toast.success('Bar eliminado exitosamente');
+      toast.success('Barra eliminada exitosamente');
     },
     onError: (error: Error) => {
-      toast.error(`Error al eliminar bar: ${error.message}`);
+      toast.error(`Error al eliminar barra: ${error.message}`);
     },
   });
 }

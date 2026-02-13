@@ -71,7 +71,7 @@ export function POSKioskPage() {
   // Create sale mutation
   const createSaleMutation = useMutation({
     mutationFn: (data: {
-      items: Array<{ productId: number; quantity: number; unitPrice: number }>;
+      items: Array<{ cocktailId: number; quantity: number }>;
       paymentMethod: POSPaymentMethod;
       idempotencyKey: string;
     }) =>
@@ -85,21 +85,26 @@ export function POSKioskPage() {
       setCart([]);
       setCheckoutOpen(false);
       setReceiptOpen(true);
-      toast.success('Sale completed successfully!');
+      toast.success('¡Venta completada!');
       queryClient.invalidateQueries({ queryKey: ['pos-config', posnetId] });
     },
     onError: (err: any) => {
-      toast.error(err.response?.data?.message || 'Failed to process sale');
+      toast.error(err.response?.data?.message || 'Error al procesar la venta');
     },
   });
 
-  // Heartbeat effect
+  // Heartbeat effect - only send when config and session are loaded
   useEffect(() => {
+    if (!config?.session?.id) return; // Don't send heartbeat until session is loaded
+
     const interval = setInterval(() => {
-      posDeviceApi.heartbeat(Number(posnetId), config?.session?.id).catch(() => {
+      posDeviceApi.heartbeat(Number(posnetId), config.session.id).catch(() => {
         // Silently fail heartbeat
       });
     }, 30000);
+
+    // Send initial heartbeat immediately
+    posDeviceApi.heartbeat(Number(posnetId), config.session.id).catch(() => {});
 
     return () => clearInterval(interval);
   }, [posnetId, config?.session?.id]);
@@ -121,7 +126,9 @@ export function POSKioskPage() {
   // Cart operations
   const addToCart = useCallback((product: POSProduct) => {
     if (!product.available) {
-      toast.error('This product is currently unavailable');
+      toast.error(`"${product.name}" no tiene stock disponible`, {
+        description: 'No se puede agregar al carrito porque no hay suficiente inventario.',
+      });
       return;
     }
 
@@ -130,7 +137,9 @@ export function POSKioskPage() {
       if (existing) {
         // Check stock limit if available
         if (product.stockLevel !== undefined && existing.quantity >= product.stockLevel) {
-          toast.error('Not enough stock available');
+          toast.error(`Stock insuficiente para "${product.name}"`, {
+            description: `Solo quedan ${product.stockLevel} unidades disponibles.`,
+          });
           return prev;
         }
         return prev.map((item) =>
@@ -156,7 +165,9 @@ export function POSKioskPage() {
               item.product.stockLevel !== undefined &&
               newQty > item.product.stockLevel
             ) {
-              toast.error('Not enough stock available');
+              toast.error(`Stock insuficiente para "${item.product.name}"`, {
+                description: `Solo quedan ${item.product.stockLevel} unidades disponibles.`,
+              });
               return item;
             }
             return { ...item, quantity: newQty };
@@ -200,14 +211,23 @@ export function POSKioskPage() {
   // Handle checkout
   const handleCheckout = () => {
     if (cart.length === 0) {
-      toast.error('Cart is empty');
+      toast.error('El carrito está vacío');
       return;
     }
+
+    // Validate all items have a cocktailId
+    const invalidItems = cart.filter((item) => !item.product.cocktailId);
+    if (invalidItems.length > 0) {
+      toast.error(
+        `Los siguientes productos no tienen un cocktail asignado: ${invalidItems.map((i) => i.product.name).join(', ')}`
+      );
+      return;
+    }
+
     createSaleMutation.mutate({
       items: cart.map((item) => ({
-        productId: item.product.id,
+        cocktailId: item.product.cocktailId!,
         quantity: item.quantity,
-        unitPrice: item.product.price,
       })),
       paymentMethod: selectedPaymentMethod,
       idempotencyKey: `${posnetId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -390,8 +410,13 @@ export function POSKioskPage() {
                     </div>
                   )}
                   
-                  {product.stockLevel !== undefined && product.stockLevel <= 5 && (
-                    <Badge variant="outline" className="mt-1 text-xs">
+                  {product.stockLevel !== undefined && product.stockLevel === 0 && (
+                    <Badge variant="destructive" className="mt-1 text-xs">
+                      Sin stock
+                    </Badge>
+                  )}
+                  {product.stockLevel !== undefined && product.stockLevel > 0 && product.stockLevel <= 5 && (
+                    <Badge variant="outline" className="mt-1 text-xs text-amber-600 border-amber-300">
                       {product.stockLevel} restantes
                     </Badge>
                   )}
@@ -531,17 +556,17 @@ export function POSKioskPage() {
                 <span>Efectivo</span>
               </Button>
               <Button
-                variant={selectedPaymentMethod === 'card' ? 'default' : 'outline'}
+                variant={selectedPaymentMethod === 'credit' ? 'default' : 'outline'}
                 className="h-20 flex-col gap-2"
-                onClick={() => setSelectedPaymentMethod('card')}
+                onClick={() => setSelectedPaymentMethod('credit')}
               >
                 <CreditCard className="h-6 w-6" />
                 <span>Tarjeta</span>
               </Button>
               <Button
-                variant={selectedPaymentMethod === 'digital' ? 'default' : 'outline'}
+                variant={selectedPaymentMethod === 'wallet' ? 'default' : 'outline'}
                 className="h-20 flex-col gap-2"
-                onClick={() => setSelectedPaymentMethod('digital')}
+                onClick={() => setSelectedPaymentMethod('wallet')}
               >
                 <Smartphone className="h-6 w-6" />
                 <span>Digital</span>

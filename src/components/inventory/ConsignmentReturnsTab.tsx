@@ -135,10 +135,9 @@ export function ConsignmentReturnsTab({
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Consignment Return Summary</CardTitle>
+                <CardTitle>Resumen de Devolución de Consignación</CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
-                  System-calculated quantities to return. These values cannot be
-                  modified.
+                  Cantidades calculadas por el sistema. Estos valores no se pueden modificar.
                 </p>
               </div>
               {totalToReturn > 0 && (
@@ -149,12 +148,12 @@ export function ConsignmentReturnsTab({
                   {isExecutingAll ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Executing...
+                      Ejecutando...
                     </>
                   ) : (
                     <>
                       <Package className="mr-2 h-4 w-4" />
-                      Execute All Returns
+                      Ejecutar Todas las Devoluciones
                     </>
                   )}
                 </Button>
@@ -174,11 +173,10 @@ export function ConsignmentReturnsTab({
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Package className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-lg font-medium text-muted-foreground mb-2">
-              No consignment stock to return
+              No hay stock en consignación para devolver
             </p>
             <p className="text-sm text-muted-foreground text-center max-w-md">
-              All consignment stock has been returned or there is no consignment
-              stock in this bar.
+              Todo el stock en consignación fue devuelto o no hay stock en consignación en esta barra.
             </p>
           </CardContent>
         </Card>
@@ -187,18 +185,18 @@ export function ConsignmentReturnsTab({
       {/* History Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Return History</CardTitle>
+          <CardTitle>Historial de Devoluciones</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Item</TableHead>
-                  <TableHead>Quantity Returned</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Proveedor</TableHead>
+                  <TableHead>Insumo</TableHead>
+                  <TableHead>Cantidad Devuelta</TableHead>
+                  <TableHead>Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -208,7 +206,7 @@ export function ConsignmentReturnsTab({
                       colSpan={5}
                       className="h-24 text-center text-muted-foreground"
                     >
-                      No returns recorded yet
+                      No hay devoluciones registradas
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -218,14 +216,14 @@ export function ConsignmentReturnsTab({
                         {new Date(returnItem.returnedAt).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        {returnItem.supplier?.name || 'Unknown'}
+                        {returnItem.supplier?.name || 'Desconocido'}
                       </TableCell>
                       <TableCell>
-                        {returnItem.stock?.drink?.name || 'Unknown'}
+                        {returnItem.stock?.drink?.name || 'Desconocido'}
                       </TableCell>
                       <TableCell>{returnItem.quantityReturned}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">Completed</Badge>
+                        <Badge variant="outline">Completada</Badge>
                       </TableCell>
                     </TableRow>
                   ))
@@ -240,35 +238,35 @@ export function ConsignmentReturnsTab({
       <Dialog open={executeDialogOpen} onOpenChange={setExecuteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Execute Consignment Return</DialogTitle>
+            <DialogTitle>Ejecutar Devolución de Consignación</DialogTitle>
             <DialogDescription>
-              Return {selectedItem?.quantityToReturn} units of{' '}
-              {selectedItem?.drinkName} to {selectedItem?.supplierName}. This
-              action cannot be undone.
+              Devolver {selectedItem?.quantityToReturn} unidades de{' '}
+              {selectedItem?.drinkName} a {selectedItem?.supplierName}. Esta
+              acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="rounded-lg bg-muted p-4 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Item:</span>
+                <span className="text-muted-foreground">Insumo:</span>
                 <span className="font-medium">{selectedItem?.drinkName}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Supplier:</span>
+                <span className="text-muted-foreground">Proveedor:</span>
                 <span className="font-medium">{selectedItem?.supplierName}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Quantity to return:</span>
+                <span className="text-muted-foreground">Cantidad a devolver:</span>
                 <span className="font-medium">{selectedItem?.quantityToReturn}</span>
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes (optional)</Label>
+              <Label htmlFor="notes">Notas (opcional)</Label>
               <Textarea
                 id="notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add any notes about this return..."
+                placeholder="Agregá notas sobre esta devolución..."
                 rows={3}
               />
             </div>
@@ -279,16 +277,16 @@ export function ConsignmentReturnsTab({
               onClick={() => setExecuteDialogOpen(false)}
               disabled={isExecuting}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button onClick={handleConfirmReturn} disabled={isExecuting}>
               {isExecuting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Executing...
+                  Ejecutando...
                 </>
               ) : (
-                'Execute Return'
+                'Ejecutar Devolución'
               )}
             </Button>
           </DialogFooter>
@@ -299,20 +297,20 @@ export function ConsignmentReturnsTab({
       <Dialog open={executeAllDialogOpen} onOpenChange={setExecuteAllDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Execute All Consignment Returns</DialogTitle>
+            <DialogTitle>Ejecutar Todas las Devoluciones</DialogTitle>
             <DialogDescription>
-              This will register returns for all remaining consignment stock in
-              this bar. The quantities are system-calculated and cannot be
-              modified. Continue?
+              Se registrarán devoluciones para todo el stock en consignación restante en
+              esta barra. Las cantidades son calculadas por el sistema y no se pueden
+              modificar. ¿Continuar?
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-lg bg-muted p-4 space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Total items to return:</span>
+              <span className="text-muted-foreground">Insumos a devolver:</span>
               <span className="font-medium">{summary.length}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Total quantity:</span>
+              <span className="text-muted-foreground">Cantidad total:</span>
               <span className="font-medium">{totalToReturn}</span>
             </div>
           </div>
@@ -322,16 +320,16 @@ export function ConsignmentReturnsTab({
               onClick={() => setExecuteAllDialogOpen(false)}
               disabled={isExecutingAll}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button onClick={handleExecuteAll} disabled={isExecutingAll}>
               {isExecutingAll ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Executing...
+                  Ejecutando...
                 </>
               ) : (
-                'Execute All Returns'
+                'Ejecutar Todas las Devoluciones'
               )}
             </Button>
           </DialogFooter>

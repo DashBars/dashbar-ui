@@ -82,29 +82,29 @@ export function BarFormDialog({
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{isEdit ? 'Edit Bar' : 'Create Bar'}</DialogTitle>
+            <DialogTitle>{isEdit ? 'Editar Barra' : 'Crear Barra'}</DialogTitle>
             <DialogDescription>
               {isEdit
-                ? 'Update the bar details below.'
-                : 'Create a new bar for this event.'}
+                ? 'Actualizá los detalles de la barra.'
+                : 'Creá una nueva barra para este evento.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">Nombre</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                placeholder="Bar name"
+                placeholder="Nombre de la barra"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="type">Type</Label>
+              <Label htmlFor="type">Tipo</Label>
               <Select value={type} onValueChange={(value) => setType(value as BarType)}>
                 <SelectTrigger id="type">
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue placeholder="Seleccionar tipo" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="VIP">VIP</SelectItem>
@@ -116,27 +116,27 @@ export function BarFormDialog({
             </div>
             {isEdit ? (
               <div className="grid gap-2">
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status">Estado</Label>
                 <Select value={status} onValueChange={(value) => setStatus(value as BarStatus)}>
                   <SelectTrigger id="status">
-                    <SelectValue placeholder="Select status" />
+                    <SelectValue placeholder="Seleccionar estado" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                    <SelectItem value="lowStock">Low Stock</SelectItem>
+                    <SelectItem value="open">Abierta</SelectItem>
+                    <SelectItem value="closed">Cerrada</SelectItem>
+                    <SelectItem value="lowStock">Stock bajo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             ) : (
               <div className="grid gap-2">
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status">Estado</Label>
                 <Select value="closed" disabled>
                   <SelectTrigger id="status" className="bg-muted text-muted-foreground">
-                    <SelectValue placeholder="Closed" />
+                    <SelectValue placeholder="Cerrada" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="closed">Closed</SelectItem>
+                    <SelectItem value="closed">Cerrada</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
@@ -151,13 +151,13 @@ export function BarFormDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button
               type="submit"
               disabled={createBar.isPending || updateBar.isPending}
             >
-              {isEdit ? 'Update' : 'Create'}
+              {isEdit ? 'Actualizar' : 'Crear'}
             </Button>
           </DialogFooter>
         </form>

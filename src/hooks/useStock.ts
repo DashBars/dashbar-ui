@@ -12,6 +12,8 @@ export const stockKeys = {
   summaries: () => [...stockKeys.all, 'summary'] as const,
   summary: (eventId: number, barId: number) =>
     [...stockKeys.summaries(), eventId, barId] as const,
+  drinks: (eventId: number, barId: number) =>
+    [...stockKeys.all, 'drinks', eventId, barId] as const,
 };
 
 // Hooks
@@ -20,6 +22,24 @@ export function useStock(eventId: number, barId: number) {
     queryKey: stockKeys.list(eventId, barId),
     queryFn: () => stockApi.getStock(eventId, barId),
     enabled: !!eventId && !!barId,
+  });
+}
+
+/** Get unique drinks available in a bar's stock (for recipe ingredient selection) */
+export function useBarStockDrinks(eventId: number, barId: number) {
+  return useQuery({
+    queryKey: stockKeys.drinks(eventId, barId),
+    queryFn: () => stockApi.getStockDrinks(eventId, barId),
+    enabled: !!eventId && !!barId,
+  });
+}
+
+/** Get unique recipe drinks across all bars of a given type in an event */
+export function useBarTypeDrinks(eventId: number, barType: string) {
+  return useQuery({
+    queryKey: ['stock', 'drinks-by-type', eventId, barType] as const,
+    queryFn: () => stockApi.getDrinksByBarType(eventId, barType),
+    enabled: !!eventId && !!barType,
   });
 }
 

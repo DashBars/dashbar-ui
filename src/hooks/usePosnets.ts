@@ -32,12 +32,12 @@ export function useCreatePosnet(eventId: number) {
     mutationFn: (dto: CreatePosnetDto) => posnetsApi.createPosnet(eventId, dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: posnetsKeys.list(eventId) });
-      toast.success('POS terminal created successfully');
+      toast.success('Terminal POS creado correctamente');
     },
     onError: (error: unknown) => {
       const msg = (error as { response?: { data?: { message?: string } } })?.response
         ?.data?.message;
-      toast.error(msg || 'Failed to create POS terminal');
+      toast.error(msg || 'Error al crear el terminal POS');
     },
   });
 }
@@ -49,12 +49,12 @@ export function useUpdatePosnet(id: number, eventId: number) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: posnetsKeys.list(eventId) });
       queryClient.invalidateQueries({ queryKey: posnetsKeys.detail(id) });
-      toast.success('POS terminal updated successfully');
+      toast.success('Terminal POS actualizado correctamente');
     },
     onError: (error: unknown) => {
       const msg = (error as { response?: { data?: { message?: string } } })?.response
         ?.data?.message;
-      toast.error(msg || 'Failed to update POS terminal');
+      toast.error(msg || 'Error al actualizar el terminal POS');
     },
   });
 }
@@ -65,28 +65,29 @@ export function useDeletePosnet(eventId: number) {
     mutationFn: (id: number) => posnetsApi.deletePosnet(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: posnetsKeys.list(eventId) });
-      toast.success('POS terminal deleted successfully');
+      toast.success('Terminal POS eliminado correctamente');
     },
     onError: (error: unknown) => {
       const msg = (error as { response?: { data?: { message?: string } } })?.response
         ?.data?.message;
-      toast.error(msg || 'Failed to delete POS terminal');
+      toast.error(msg || 'Error al eliminar el terminal POS');
     },
   });
 }
 
-export function useRotatePosnetToken(id: number) {
+export function useRotatePosnetToken(eventId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => posnetsApi.rotateToken(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: posnetsKeys.detail(id) });
-      toast.success('Token rotated successfully');
+    mutationFn: (posnetId: number) => posnetsApi.rotateToken(posnetId),
+    onSuccess: (_data, posnetId) => {
+      queryClient.invalidateQueries({ queryKey: posnetsKeys.detail(posnetId) });
+      queryClient.invalidateQueries({ queryKey: posnetsKeys.list(eventId) });
+      toast.success('Token rotado correctamente');
     },
     onError: (error: unknown) => {
       const msg = (error as { response?: { data?: { message?: string } } })?.response
         ?.data?.message;
-      toast.error(msg || 'Failed to rotate token');
+      toast.error(msg || 'Error al rotar el token. Verificá que el terminal exista.');
     },
   });
 }

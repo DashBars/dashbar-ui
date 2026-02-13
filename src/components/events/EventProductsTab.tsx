@@ -32,9 +32,8 @@ import { useBars } from '@/hooks/useBars';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { EventProduct } from '@/lib/api/types';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Package, Info, Snowflake } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package, Info, Snowflake, GlassWater, Beaker } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useDrinks } from '@/hooks/useDrinks';
 
 interface EventProductsTabProps {
   eventId: number;
@@ -62,8 +61,6 @@ export function EventProductsTab({ eventId, isEditable }: EventProductsTabProps)
   const { data: recipes = [], isLoading: isLoadingRecipes } = useEventRecipes(eventId);
   const { data: allCocktails = [], isLoading: isLoadingCocktails } = useCocktails(false);
   const { data: bars = [] } = useBars(eventId);
-  const { data: drinks = [] } = useDrinks();
-
   // Filter recipes that are "producto final" (have salePrice > 0)
   const finalRecipes = recipes.filter((r) => r.salePrice > 0);
   
@@ -113,7 +110,7 @@ export function EventProductsTab({ eventId, isEditable }: EventProductsTabProps)
     }
 
     if (selectedCocktailIds.length === 0) {
-      toast.error('Selecciona al menos un cocktail');
+      toast.error('Seleccioná al menos un trago');
       return;
     }
 
@@ -164,58 +161,6 @@ export function EventProductsTab({ eventId, isEditable }: EventProductsTabProps)
     backstage: 'Backstage',
     lounge: 'Lounge',
   };
-
-  // Generate a component signature for a recipe (sorted drink IDs)
-  const getComponentSignature = (components: Array<{ drinkId: number }>): string => {
-    return components
-      .map(c => c.drinkId)
-      .sort((a, b) => a - b)
-      .join('-');
-  };
-
-  // Group products by their recipe's component signature
-  const groupedProducts = useMemo(() => {
-    const groups = new Map<string, {
-      displayName: string;
-      alternateNames: string[];
-      products: EventProduct[];
-      recipes: typeof recipes;
-      componentDrinkIds: number[];
-    }>();
-
-    products.forEach(product => {
-      const recipe = getRecipeForProduct(product.name);
-      
-      // If no recipe, use product name as signature
-      const signature = recipe 
-        ? getComponentSignature(recipe.components)
-        : `direct-${product.name.toLowerCase()}`;
-      
-      const existing = groups.get(signature);
-      
-      if (existing) {
-        existing.products.push(product);
-        if (!existing.alternateNames.includes(product.name)) {
-          existing.alternateNames.push(product.name);
-        }
-        if (recipe && !existing.recipes.find(r => r.id === recipe.id)) {
-          existing.recipes.push(recipe);
-        }
-      } else {
-        groups.set(signature, {
-          displayName: product.name,
-          alternateNames: [product.name],
-          products: [product],
-          recipes: recipe ? [recipe] : [],
-          componentDrinkIds: recipe 
-            ? recipe.components.map(c => c.drinkId).sort((a, b) => a - b)
-            : []
-        });
-      }
-    });
-
-    return Array.from(groups.values());
-  }, [products, recipes]);
 
   return (
     <div className="space-y-4">
@@ -275,7 +220,7 @@ export function EventProductsTab({ eventId, isEditable }: EventProductsTabProps)
         {scope === 'bar' && selectedBarId == null ? (
           <div className="text-center py-8 text-muted-foreground">
             {bars.length === 0 
-              ? 'Este evento no tiene barras. Creá barras primero en la pestaña "Bars".'
+              ? 'Este evento no tiene barras. Creá barras primero en la pestaña "Barras".'
               : 'Selecciona una barra para ver sus productos.'}
           </div>
         ) : isLoading ? (
@@ -289,154 +234,122 @@ export function EventProductsTab({ eventId, isEditable }: EventProductsTabProps)
             No hay productos {scope === 'bar' && selectedBarId ? 'para esta barra' : 'del evento'}
           </div>
         ) : (
-          <div className="space-y-4">
-            {groupedProducts.map((group) => {
-              const { displayName, alternateNames, products: groupProducts, componentDrinkIds } = group;
-              const hasMultipleNames = alternateNames.length > 1;
-              
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {products.map((product) => {
+              const recipe = getRecipeForProduct(product.name);
+              const totalPercentage = recipe
+                ? recipe.components.reduce((sum, c) => sum + c.percentage, 0)
+                : 0;
+
               return (
-                <div key={displayName} className="rounded-xl border bg-card overflow-hidden">
-                  {/* Product Group Header */}
-                  <div className="border-b bg-muted/30 px-4 py-3">
-                    <div className="flex flex-col gap-1">
-                      <h3 className="font-semibold text-base flex items-center gap-2">
-                        <Package className="h-4 w-4 text-primary" />
-                        {displayName}
-                        <Badge variant="secondary" className="ml-2 font-normal">
-                          {groupProducts.length} {groupProducts.length === 1 ? 'variante' : 'variantes'}
-                        </Badge>
-                      </h3>
-                      {hasMultipleNames && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap">
-                          <span>También conocido como:</span>
-                          {alternateNames
-                            .filter(n => n !== displayName)
-                            .map((name) => (
-                              <Badge key={name} variant="outline" className="text-xs font-normal">
-                                {name}
-                              </Badge>
-                            ))}
-                        </p>
+                <Card key={product.id} className="rounded-xl flex flex-col">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">{product.name}</CardTitle>
+                      <Badge variant="default" className="gap-1 shrink-0">
+                        {formatPrice(product.price)}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                      {recipe && (
+                        <>
+                          <span className="flex items-center gap-1">
+                            <GlassWater className="h-3.5 w-3.5" />
+                            {recipe.glassVolume}ml
+                          </span>
+                          {recipe.hasIce && (
+                            <span className="flex items-center gap-1">
+                              <Snowflake className="h-3.5 w-3.5 text-blue-500" />
+                              Con hielo
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Beaker className="h-3.5 w-3.5" />
+                            {recipe.components.length} insumos
+                          </span>
+                        </>
                       )}
                     </div>
-                  </div>
-                  
-                  {/* Products Table */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-muted/20">
-                          <th className="text-left font-medium px-4 py-2 text-muted-foreground">Barras</th>
-                          <th className="text-center font-medium px-3 py-2 text-muted-foreground w-20">Vaso</th>
-                          <th className="text-center font-medium px-3 py-2 text-muted-foreground w-20">Hielo</th>
-                          <th className="text-right font-medium px-3 py-2 text-muted-foreground w-28">Precio</th>
-                          {/* Component columns */}
-                          {componentDrinkIds.map(drinkId => {
-                            const drink = drinks.find(d => d.id === drinkId);
-                            return (
-                              <th key={drinkId} className="text-center font-medium px-3 py-2 text-muted-foreground min-w-[80px]">
-                                <div className="flex flex-col items-center">
-                                  <span className="truncate max-w-[100px]" title={drink?.name}>
-                                    {drink?.name || `#${drinkId}`}
-                                  </span>
-                                  <span className="text-xs font-normal opacity-70">{drink?.brand}</span>
-                                </div>
-                              </th>
-                            );
-                          })}
-                          {isEditable && <th className="w-24"></th>}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {groupProducts.map((product) => {
-                          const recipe = getRecipeForProduct(product.name);
-                          
-                          return (
-                            <tr key={product.id} className="hover:bg-muted/30 transition-colors">
-                              {/* Bar types */}
-                              <td className="px-4 py-3">
-                                <div className="flex flex-wrap gap-1">
-                                  {recipe && recipe.barTypes.length > 0 ? (
-                                    recipe.barTypes.map((bt) => (
-                                      <Badge key={bt} variant="default" className="text-xs">
-                                        {barTypeLabels[bt] || bt}
-                                      </Badge>
-                                    ))
-                                  ) : (
-                                    <Badge variant="outline" className="text-xs text-muted-foreground">
-                                      Todas
-                                    </Badge>
-                                  )}
-                                </div>
-                              </td>
-                              {/* Glass volume */}
-                              <td className="text-center px-3 py-3">
-                                {recipe ? (
-                                  <>
-                                    <span className="font-medium">{recipe.glassVolume}</span>
-                                    <span className="text-muted-foreground text-xs ml-0.5">ml</span>
-                                  </>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </td>
-                              {/* Ice */}
-                              <td className="text-center px-3 py-3">
-                                {recipe?.hasIce ? (
-                                  <Snowflake className="h-4 w-4 text-blue-500 mx-auto" />
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </td>
-                              {/* Price */}
-                              <td className="text-right px-3 py-3 font-bold text-primary">
-                                {formatPrice(product.price)}
-                              </td>
-                              {/* Component percentages */}
-                              {componentDrinkIds.map(drinkId => {
-                                const component = recipe?.components.find(c => c.drinkId === drinkId);
-                                return (
-                                  <td key={drinkId} className="text-center px-3 py-3">
-                                    {component ? (
-                                      <span className="inline-flex items-center justify-center bg-primary/10 text-primary font-semibold rounded px-2 py-0.5 min-w-[40px]">
-                                        {component.percentage}%
-                                      </span>
-                                    ) : (
-                                      <span className="text-muted-foreground">—</span>
-                                    )}
-                                  </td>
-                                );
-                              })}
-                              {/* Actions */}
-                              {isEditable && (
-                                <td className="px-3 py-3">
-                                  <div className="flex gap-1 justify-end">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2"
-                                      onClick={() => handleOpenDialog(product)}
-                                    >
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2 text-destructive hover:text-destructive"
-                                      onClick={() => handleDelete(product.id)}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                </td>
-                              )}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                  </CardHeader>
+                  <CardContent className="pt-0 flex-1 flex flex-col">
+                    {/* Components with progress bars */}
+                    {recipe && (
+                      <div className="space-y-1.5">
+                        {recipe.components.map((component) => (
+                          <div
+                            key={component.id}
+                            className="flex items-center justify-between text-sm"
+                          >
+                            <span className="text-muted-foreground truncate mr-2">
+                              {component.drink?.name || `Insumo ${component.drinkId}`}
+                            </span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-primary/60"
+                                  style={{ width: `${component.percentage}%` }}
+                                />
+                              </div>
+                              <span className="text-xs font-medium w-8 text-right">
+                                {component.percentage}%
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                        {totalPercentage < 100 && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground italic">Resto (hielo, agua, etc.)</span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-muted-foreground/20"
+                                  style={{ width: `${100 - totalPercentage}%` }}
+                                />
+                              </div>
+                              <span className="text-xs font-medium w-8 text-right text-muted-foreground">
+                                {100 - totalPercentage}%
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Bar types */}
+                    {recipe && recipe.barTypes.length > 0 && (
+                      <div className="flex items-center gap-1.5 mt-auto pt-3 border-t mt-3">
+                        <span className="text-xs text-muted-foreground">Barras:</span>
+                        {recipe.barTypes.map((bt) => (
+                          <Badge key={bt} variant="outline" className="text-xs py-0">
+                            {barTypeLabels[bt] || bt}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    {isEditable && (
+                      <div className="flex justify-end gap-1 mt-3 pt-2 border-t">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => handleOpenDialog(product)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(product.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
@@ -466,7 +379,7 @@ export function EventProductsTab({ eventId, isEditable }: EventProductsTabProps)
                     required
                   />
                   <p className="text-sm text-muted-foreground mt-1">
-                    Puedes usar nombres personalizados como "Combo VIP" o "Promo Happy Hour"
+                    Podés usar nombres personalizados como "Combo VIP" o "Promo Hora Feliz"
                   </p>
                 </div>
                 <div>
@@ -496,7 +409,7 @@ export function EventProductsTab({ eventId, isEditable }: EventProductsTabProps)
                     <div className="border rounded-lg p-4 text-center text-sm text-muted-foreground">
                       <p>No hay recetas marcadas como "producto final".</p>
                       <p className="mt-1">
-                        Ve a la pestaña <strong>Recetas</strong> y activa el toggle "Es producto final" en las recetas que quieras vender.
+                        Andá a la pestaña <strong>Recetas</strong> y configurá como "producto final" las recetas que quieras vender.
                       </p>
                     </div>
                   ) : (

@@ -38,7 +38,7 @@ export function ConsignmentReturnSummary({
               <div className="flex items-center justify-between w-full pr-4">
                 <span className="font-medium">{supplierName}</span>
                 <Badge variant="secondary" className="ml-2">
-                  {totalToReturn} units to return
+                  {totalToReturn} unidades a devolver
                 </Badge>
               </div>
             </AccordionTrigger>
@@ -63,26 +63,26 @@ export function ConsignmentReturnSummary({
                           disabled={isExecuting}
                         >
                           <Package className="mr-2 h-4 w-4" />
-                          Return {item.quantityToReturn} units
+                          Devolver {item.quantityToReturn} unidades
                         </Button>
                       )}
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <div className="text-muted-foreground">Received</div>
+                        <div className="text-muted-foreground">Recibido</div>
                         <div className="font-medium">{item.totalReceived}</div>
                       </div>
                       <div>
-                        <div className="text-muted-foreground">Sold/Consumed</div>
+                        <div className="text-muted-foreground">Vendido/Consumido</div>
                         <div className="font-medium">{item.totalConsumed}</div>
                       </div>
                       <div>
-                        <div className="text-muted-foreground">Already Returned</div>
+                        <div className="text-muted-foreground">Ya Devuelto</div>
                         <div className="font-medium">{item.totalReturned}</div>
                       </div>
                       <div>
-                        <div className="text-muted-foreground">Remaining</div>
+                        <div className="text-muted-foreground">Restante</div>
                         <div className="font-medium text-primary">
                           {item.currentStockQuantity}
                         </div>

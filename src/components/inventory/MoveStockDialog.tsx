@@ -58,6 +58,12 @@ export function MoveStockDialog({
     },
   });
 
+  // Convert ml to units (bottles/cans) for display
+  const drinkVolume = stock.drink?.volume || 0;
+  const availableUnits = drinkVolume > 0
+    ? Math.floor(stock.quantity / drinkVolume)
+    : stock.quantity;
+
   const resetForm = () => {
     setToBarId('');
     setQuantity('');
@@ -66,11 +72,11 @@ export function MoveStockDialog({
 
   useEffect(() => {
     if (open) {
-      setQuantity(stock.quantity.toString());
+      setQuantity(availableUnits.toString());
     } else {
       resetForm();
     }
-  }, [open, stock]);
+  }, [open, stock, availableUnits]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -86,9 +92,9 @@ export function MoveStockDialog({
       return;
     }
 
-    if (quantityNum > stock.quantity) {
+    if (quantityNum > availableUnits) {
       toast.error(
-        `No puedes mover ${quantityNum} unidades. Solo hay ${stock.quantity} disponibles.`,
+        `No puedes mover ${quantityNum} unidades. Solo hay ${availableUnits} disponibles.`,
       );
       return;
     }
@@ -101,6 +107,7 @@ export function MoveStockDialog({
       return;
     }
 
+    // Send quantity in UNITS (bottles) — backend handles ml conversion
     const dto: MoveStockDto = {
       eventId,
       fromBarId,
@@ -134,7 +141,10 @@ export function MoveStockDialog({
                   {stock.drink?.brand || '—'} - {stock.supplier?.name || `Supplier ${stock.supplierId}`}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Cantidad disponible: {stock.quantity}
+                  Cantidad disponible: {availableUnits} {availableUnits === 1 ? 'unidad' : 'unidades'}
+                  {drinkVolume > 0 && (
+                    <span className="text-xs"> ({drinkVolume} ml c/u)</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -169,21 +179,21 @@ export function MoveStockDialog({
 
             <div className="space-y-2">
               <Label htmlFor="quantity">
-                Cantidad <span className="text-destructive">*</span>
+                Cantidad (unidades) <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="quantity"
                 type="number"
                 min="1"
-                max={stock.quantity}
+                max={availableUnits}
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 required
                 disabled={moveMutation.isPending}
-                placeholder={`Máximo: ${stock.quantity}`}
+                placeholder={`Máximo: ${availableUnits}`}
               />
               <p className="text-xs text-muted-foreground">
-                Cantidad disponible: {stock.quantity}
+                Cantidad disponible: {availableUnits} {availableUnits === 1 ? 'unidad' : 'unidades'}
               </p>
             </div>
 

@@ -26,12 +26,12 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
-    title: 'Events',
+    title: 'Eventos',
     href: '/events',
     icon: Calendar,
   },
   {
-    title: 'Venues',
+    title: 'Sedes',
     href: '/venues',
     icon: MapPin,
     roles: ['manager', 'admin'],
@@ -42,7 +42,7 @@ const navItems: NavItem[] = [
     icon: Truck,
   },
   {
-    title: 'Reports',
+    title: 'Reportes',
     href: '/reports',
     icon: BarChart3,
   },
@@ -124,7 +124,7 @@ export function Topbar() {
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="md:hidden">
               <Menu className="h-5 w-5" />
-              <span className="sr-only">Toggle menu</span>
+              <span className="sr-only">Menú</span>
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0">
@@ -163,12 +163,12 @@ export function Topbar() {
             <DropdownMenuSeparator />
             <DropdownMenuItem disabled>
               <User className="mr-2 h-4 w-4" />
-              <span>Profile</span>
+              <span>Perfil</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout}>
               <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
+              <span>Cerrar sesión</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

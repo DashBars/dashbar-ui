@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, ShoppingCart, Wrench, Undo2, Package, Beaker } from 'lucide-react';
+import { PackagePlus, PackageMinus, ArrowLeftRight, ShoppingCart, Wrench, CornerUpLeft, Package, Beaker } from 'lucide-react';
 import type { InventoryMovement } from '@/lib/api/types';
 
 interface BarMovementsTabProps {
@@ -27,65 +27,64 @@ function formatQuantity(movement: InventoryMovement) {
   return Math.abs(movement.quantity).toString();
 }
 
-function getMovementDescription(movement: InventoryMovement): { text: string; icon: React.ReactNode; color: string } {
+function getMovementDescription(movement: InventoryMovement): { text: string; icon: React.ReactNode; iconColor: string } {
   const reason = movement.reason;
   
   switch (reason) {
     case 'ASSIGN_TO_BAR':
       return {
         text: 'Asignado desde almacén general',
-        icon: <ArrowDownToLine className="h-4 w-4" />,
-        color: 'text-green-600',
+        icon: <PackagePlus className="h-4 w-4" />,
+        iconColor: 'text-green-600',
       };
     case 'RETURN_TO_GLOBAL':
       return {
         text: 'Devuelto a almacén general',
-        icon: <ArrowUpFromLine className="h-4 w-4" />,
-        color: 'text-orange-600',
+        icon: <PackageMinus className="h-4 w-4" />,
+        iconColor: 'text-orange-600',
       };
     case 'MOVE_BETWEEN_BARS':
       return {
         text: movement.quantity > 0 ? 'Recibido desde otra barra' : 'Enviado a otra barra',
         icon: <ArrowLeftRight className="h-4 w-4" />,
-        color: 'text-blue-600',
+        iconColor: 'text-blue-600',
       };
     case 'SALE_DECREMENT':
       return {
         text: 'Venta',
         icon: <ShoppingCart className="h-4 w-4" />,
-        color: 'text-purple-600',
+        iconColor: 'text-purple-600',
       };
     case 'ADJUSTMENT':
       return {
         text: 'Ajuste manual',
         icon: <Wrench className="h-4 w-4" />,
-        color: 'text-gray-600',
+        iconColor: 'text-gray-600',
       };
     case 'RETURN_TO_PROVIDER':
       return {
         text: 'Devuelto a proveedor',
-        icon: <Undo2 className="h-4 w-4" />,
-        color: 'text-red-600',
+        icon: <CornerUpLeft className="h-4 w-4" />,
+        iconColor: 'text-red-600',
       };
     case 'INITIAL_LOAD':
       return {
         text: 'Carga inicial',
         icon: <Package className="h-4 w-4" />,
-        color: 'text-teal-600',
+        iconColor: 'text-teal-600',
       };
     default:
-      // Fallback based on type/quantity
       if (movement.type === 'transfer_in' || movement.quantity > 0) {
         return {
           text: 'Entrada de stock',
-          icon: <ArrowDownToLine className="h-4 w-4" />,
-          color: 'text-green-600',
+          icon: <PackagePlus className="h-4 w-4" />,
+          iconColor: 'text-green-600',
         };
       }
       return {
         text: 'Salida de stock',
-        icon: <ArrowUpFromLine className="h-4 w-4" />,
-        color: 'text-orange-600',
+        icon: <PackageMinus className="h-4 w-4" />,
+        iconColor: 'text-orange-600',
       };
   }
 }
@@ -161,10 +160,10 @@ export function BarMovementsTab({ eventId, barId }: BarMovementsTabProps) {
                           {formatDate(movement.createdAt)}
                         </TableCell>
                         <TableCell className="font-medium">
-                          {movement.drink?.name || `Drink ${movement.drinkId}`}
+                          {movement.drink?.name || 'Insumo desconocido'}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {movement.supplier?.name || `Supplier ${movement.supplierId}`}
+                          {movement.supplier?.name || 'Proveedor desconocido'}
                         </TableCell>
                         <TableCell>
                           {purposeBadge || <span className="text-muted-foreground text-sm">—</span>}
@@ -175,8 +174,8 @@ export function BarMovementsTab({ eventId, barId }: BarMovementsTabProps) {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <div className={`flex items-center gap-2 ${description.color}`}>
-                            {description.icon}
+                          <div className="flex items-center gap-2">
+                            <span className={description.iconColor}>{description.icon}</span>
                             <span className="text-sm">{description.text}</span>
                           </div>
                         </TableCell>

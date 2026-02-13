@@ -38,10 +38,10 @@ export function useExecuteReturn(eventId: number, barId: number) {
       queryClient.invalidateQueries({ 
         queryKey: ['stock', 'consignment-returns', eventId, barId] 
       });
-      toast.success('Consignment return executed successfully');
+      toast.success('Devolución de consignación ejecutada exitosamente');
     },
     onError: (error: Error) => {
-      toast.error(`Error executing return: ${error.message}`);
+      toast.error(`Error al ejecutar la devolución: ${error.message}`);
     },
   });
 }
@@ -58,10 +58,10 @@ export function useExecuteAllReturns(eventId: number, barId: number) {
       queryClient.invalidateQueries({ 
         queryKey: ['stock', 'consignment-returns', eventId, barId] 
       });
-      toast.success('All consignment returns executed successfully');
+      toast.success('Todas las devoluciones de consignación ejecutadas exitosamente');
     },
     onError: (error: Error) => {
-      toast.error(`Error executing all returns: ${error.message}`);
+      toast.error(`Error al ejecutar las devoluciones: ${error.message}`);
     },
   });
 }

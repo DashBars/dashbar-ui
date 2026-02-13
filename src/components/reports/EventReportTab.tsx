@@ -1,9 +1,13 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { reportsApi } from '@/lib/api/dashbar';
 import type { EventReportData, BucketSize } from '@/lib/api/types';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ReportSummaryCards } from './ReportSummaryCards';
 import { PeakHoursChart } from './PeakHoursChart';
 import { TopProductsChart } from './TopProductsChart';
@@ -11,9 +15,7 @@ import { BarBreakdownTable } from './BarBreakdownTable';
 import { PosBreakdownTable } from './PosBreakdownTable';
 import { StockValuationTable } from './StockValuationTable';
 import {
-  RefreshCw,
   FileText,
-  FileSpreadsheet,
   AlertTriangle,
   Loader2,
   BarChart3,
@@ -22,6 +24,8 @@ import {
   Store,
   CreditCard,
   Package,
+  Mail,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -31,9 +35,8 @@ interface EventReportTabProps {
 }
 
 export function EventReportTab({ eventId, eventName }: EventReportTabProps) {
-  const queryClient = useQueryClient();
   const [selectedBucket, setSelectedBucket] = useState<BucketSize>(15);
-  const [isExporting, setIsExporting] = useState<'csv' | 'pdf' | null>(null);
+  const [isExporting, setIsExporting] = useState<'pdf' | null>(null);
 
   // Fetch report data
   const {
@@ -46,43 +49,24 @@ export function EventReportTab({ eventId, eventName }: EventReportTabProps) {
     retry: false,
   });
 
-  // Generate report mutation
-  const generateMutation = useMutation({
-    mutationFn: () => reportsApi.generateReport(eventId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['report', eventId] });
-      toast.success('Reporte generado exitosamente');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al generar el reporte');
-    },
-  });
-
-  // Export handlers
-  const handleExportCSV = async () => {
-    setIsExporting('csv');
-    try {
-      const blob = await reportsApi.downloadCSV(eventId);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `reporte_${eventName.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      toast.success('CSV descargado exitosamente');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Error al descargar CSV');
-    } finally {
-      setIsExporting(null);
-    }
-  };
-
-  const handleExportPDF = async () => {
+  // PDF download with retry
+  const handleExportPDF = async (retryCount = 0) => {
     setIsExporting('pdf');
     try {
+      // First ensure report exists
+      if (!report) {
+        toast.error('No hay reporte disponible para descargar');
+        setIsExporting(null);
+        return;
+      }
+
       const blob = await reportsApi.downloadPDF(eventId);
+      
+      // Validate blob is actually a PDF (not an error response)
+      if (blob.size < 100) {
+        throw new Error('El archivo PDF generado está vacío o corrupto');
+      }
+
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -92,10 +76,62 @@ export function EventReportTab({ eventId, eventName }: EventReportTabProps) {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       toast.success('PDF descargado exitosamente');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Error al descargar PDF');
+    } catch (err: any) {
+      if (retryCount < 2) {
+        // Retry up to 2 times
+        toast.info('Reintentando descarga...');
+        setTimeout(() => handleExportPDF(retryCount + 1), 1000);
+        return;
+      }
+      toast.error(err.response?.data?.message || err.message || 'Error al descargar PDF. Intentá de nuevo más tarde.');
     } finally {
-      setIsExporting(null);
+      if (retryCount >= 2 || retryCount === 0) {
+        setIsExporting(null);
+      }
+    }
+  };
+
+  // Email state
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [recipients, setRecipients] = useState<string[]>([]);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
+  const addRecipient = () => {
+    const email = emailInput.trim().toLowerCase();
+    if (!email) return;
+    // Basic email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Email inválido');
+      return;
+    }
+    if (recipients.includes(email)) {
+      toast.error('Este email ya fue agregado');
+      return;
+    }
+    setRecipients([...recipients, email]);
+    setEmailInput('');
+  };
+
+  const removeRecipient = (email: string) => {
+    setRecipients(recipients.filter((r) => r !== email));
+  };
+
+  const handleSendEmail = async () => {
+    if (recipients.length === 0) {
+      toast.error('Agregá al menos un destinatario');
+      return;
+    }
+    setIsSendingEmail(true);
+    try {
+      const result = await reportsApi.sendReportEmail(eventId, recipients);
+      toast.success(result.message);
+      setEmailDialogOpen(false);
+      setRecipients([]);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Error al enviar el email');
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -108,28 +144,16 @@ export function EventReportTab({ eventId, eventName }: EventReportTabProps) {
     );
   }
 
-  // No report exists - show generate button
+  // No report exists
   if (error || !report) {
     return (
       <div className="flex flex-col items-center justify-center py-12 space-y-4">
         <BarChart3 className="h-16 w-16 text-muted-foreground" />
         <h3 className="text-xl font-semibold">No hay reporte disponible</h3>
         <p className="text-muted-foreground text-center max-w-md">
-          Genera un reporte post-evento para ver análisis detallado de ventas,
-          productos más vendidos, horas pico y más.
+          El reporte se genera automáticamente al finalizar el evento.
+          Si no aparece, es posible que no haya datos de ventas suficientes.
         </p>
-        <Button
-          onClick={() => generateMutation.mutate()}
-          disabled={generateMutation.isPending}
-          size="lg"
-        >
-          {generateMutation.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="mr-2 h-4 w-4" />
-          )}
-          Generar Reporte
-        </Button>
       </div>
     );
   }
@@ -145,30 +169,6 @@ export function EventReportTab({ eventId, eventName }: EventReportTabProps) {
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            onClick={() => generateMutation.mutate()}
-            disabled={generateMutation.isPending}
-          >
-            {generateMutation.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Regenerar
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportCSV}
-            disabled={isExporting === 'csv'}
-          >
-            {isExporting === 'csv' ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-            )}
-            CSV
-          </Button>
-          <Button
-            variant="outline"
             onClick={handleExportPDF}
             disabled={isExporting === 'pdf'}
           >
@@ -177,7 +177,14 @@ export function EventReportTab({ eventId, eventName }: EventReportTabProps) {
             ) : (
               <FileText className="mr-2 h-4 w-4" />
             )}
-            PDF
+            Descargar PDF
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setEmailDialogOpen(true)}
+          >
+            <Mail className="mr-2 h-4 w-4" />
+            Enviar por email
           </Button>
         </div>
       </div>
@@ -288,6 +295,93 @@ export function EventReportTab({ eventId, eventName }: EventReportTabProps) {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Email Dialog */}
+      <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>Enviar reporte por email</DialogTitle>
+            <DialogDescription>
+              Ingresá los emails de los destinatarios. El reporte se enviará como PDF adjunto.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Destinatarios</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="email@ejemplo.com"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addRecipient();
+                    }
+                  }}
+                />
+                <Button type="button" variant="outline" onClick={addRecipient}>
+                  Agregar
+                </Button>
+              </div>
+            </div>
+
+            {recipients.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {recipients.map((email) => (
+                  <Badge
+                    key={email}
+                    variant="secondary"
+                    className="gap-1 pl-2 pr-1 py-1"
+                  >
+                    {email}
+                    <button
+                      type="button"
+                      onClick={() => removeRecipient(email)}
+                      className="ml-0.5 rounded-full hover:bg-muted p-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            {recipients.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Escribí un email y presioná Enter o hacé clic en "Agregar"
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEmailDialogOpen(false)}
+              disabled={isSendingEmail}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSendEmail}
+              disabled={recipients.length === 0 || isSendingEmail}
+            >
+              {isSendingEmail ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Enviar ({recipients.length})
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

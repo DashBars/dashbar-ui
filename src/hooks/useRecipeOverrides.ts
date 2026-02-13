@@ -33,10 +33,10 @@ export function useCreateRecipeOverride(eventId: number, barId: number) {
       queryClient.invalidateQueries({
         queryKey: recipeOverridesKeys.list(eventId, barId),
       });
-      toast.success('Recipe override creado exitosamente');
+      toast.success('Ajuste de receta creado exitosamente');
     },
     onError: (error: Error) => {
-      toast.error(`Error al crear recipe override: ${error.message}`);
+      toast.error(`Error al crear ajuste de receta: ${error.message}`);
     },
   });
 }
@@ -55,10 +55,10 @@ export function useUpdateRecipeOverride(
       queryClient.invalidateQueries({
         queryKey: recipeOverridesKeys.list(eventId, barId),
       });
-      toast.success('Recipe override actualizado exitosamente');
+      toast.success('Ajuste de receta actualizado exitosamente');
     },
     onError: (error: Error) => {
-      toast.error(`Error al actualizar recipe override: ${error.message}`);
+      toast.error(`Error al actualizar ajuste de receta: ${error.message}`);
     },
   });
 }
@@ -73,10 +73,10 @@ export function useDeleteRecipeOverride(eventId: number, barId: number) {
       queryClient.invalidateQueries({
         queryKey: recipeOverridesKeys.list(eventId, barId),
       });
-      toast.success('Recipe override eliminado exitosamente');
+      toast.success('Ajuste de receta eliminado exitosamente');
     },
     onError: (error: Error) => {
-      toast.error(`Error al eliminar recipe override: ${error.message}`);
+      toast.error(`Error al eliminar ajuste de receta: ${error.message}`);
     },
   });
 }

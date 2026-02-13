@@ -28,7 +28,7 @@ export function POSLoginPage() {
       navigate(`/pos/${response.posnet.id}/kiosk`);
     } catch (err: any) {
       const errorMessage =
-        err.response?.data?.message || 'Invalid POS code. Please try again.';
+        err.response?.data?.message || 'Código POS inválido. Intentá de nuevo.';
       setError(errorMessage);
     } finally {
       setIsSubmitting(false);

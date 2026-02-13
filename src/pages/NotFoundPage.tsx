@@ -13,7 +13,7 @@ export function NotFoundPage() {
           </p>
           <div>
             <Button asChild>
-              <Link to="/events">Volver a Events</Link>
+              <Link to="/events">Volver a Eventos</Link>
             </Button>
           </div>
         </CardContent>

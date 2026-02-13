@@ -127,6 +127,25 @@ export function StockTable(props: StockTableProps) {
     })}`;
   };
 
+  /** Format stock quantity: show units (bottles) + ml if drink volume is available */
+  const formatStockQuantity = (item: Stock) => {
+    const drinkVolume = item.drink?.volume;
+    if (drinkVolume && drinkVolume > 0) {
+      const units = Math.floor(item.quantity / drinkVolume);
+      const remainder = item.quantity % drinkVolume;
+      return (
+        <div>
+          <div className="font-medium">{units} {units === 1 ? 'unidad' : 'unidades'}</div>
+          <div className="text-xs text-muted-foreground">
+            {(item.quantity / 1000).toFixed(1)} L
+            {remainder > 0 && ` (${remainder} ml sueltos)`}
+          </div>
+        </div>
+      );
+    }
+    return <span>{item.quantity}</span>;
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -139,13 +158,13 @@ export function StockTable(props: StockTableProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Drink</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead>Quantity</TableHead>
-                {mode === 'global' && <TableHead>Available</TableHead>}
-                {mode === 'global' && <TableHead>Allocated</TableHead>}
-                <TableHead>Unit Cost</TableHead>
-                <TableHead>Ownership</TableHead>
+                <TableHead>Insumo</TableHead>
+                <TableHead>Proveedor</TableHead>
+                <TableHead>Cantidad</TableHead>
+                {mode === 'global' && <TableHead>Disponible</TableHead>}
+                {mode === 'global' && <TableHead>Asignada</TableHead>}
+                <TableHead>Costo Unit.</TableHead>
+                <TableHead>Propiedad</TableHead>
                 <TableHead className="w-[70px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -166,19 +185,45 @@ export function StockTable(props: StockTableProps) {
     );
   }
 
+  // Helper to render bar stock action menu (three-dot dropdown)
+  const renderBarActions = (item: Stock) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+          <MoreHorizontal className="h-4 w-4" />
+          <span className="sr-only">Acciones</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {'onMove' in props && props.onMove && (
+          <DropdownMenuItem onClick={() => props.onMove!(item)}>
+            <ArrowUpDown className="mr-2 h-4 w-4" />
+            Mover a otra barra
+          </DropdownMenuItem>
+        )}
+        {'onReturn' in props && props.onReturn && (
+          <DropdownMenuItem onClick={() => props.onReturn!(item)}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Devolver al almacén
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   // Helper function to render direct sale stock table (with sale price)
   const renderDirectSaleTable = (items: Stock[], emptyMessage: string) => (
     <div className="rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Drink</TableHead>
-            <TableHead>Supplier</TableHead>
-            <TableHead>Quantity</TableHead>
-            <TableHead>Unit Cost</TableHead>
-            <TableHead>Sale Price</TableHead>
-            <TableHead>Ownership</TableHead>
-            <TableHead className="w-[70px]"></TableHead>
+            <TableHead>Insumo</TableHead>
+            <TableHead>Proveedor</TableHead>
+            <TableHead>Cantidad</TableHead>
+            <TableHead>Costo Unit.</TableHead>
+            <TableHead>Precio Venta</TableHead>
+            <TableHead>Propiedad</TableHead>
+            <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -197,12 +242,12 @@ export function StockTable(props: StockTableProps) {
               return (
                 <TableRow key={itemKey}>
                   <TableCell className="font-medium">
-                    {item.drink?.name || `Drink ${item.drinkId}`}
+                    {item.drink?.name || `Insumo ${item.drinkId}`}
                   </TableCell>
                   <TableCell>
-                    {item.supplier?.name || `Supplier ${item.supplierId}`}
+                    {item.supplier?.name || `Proveedor ${item.supplierId}`}
                   </TableCell>
-                  <TableCell>{item.quantity}</TableCell>
+                  <TableCell>{formatStockQuantity(item)}</TableCell>
                   <TableCell>
                     {formatCurrency(item.unitCost, item.currency || 'ARS')}
                   </TableCell>
@@ -213,34 +258,11 @@ export function StockTable(props: StockTableProps) {
                     <Badge
                       variant={item.ownershipMode === 'consignment' ? 'secondary' : 'outline'}
                     >
-                      {item.ownershipMode}
+                      {item.ownershipMode === 'consignment' ? 'Consignación' : 'Comprado'}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      {'onMove' in props && props.onMove && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1"
-                          onClick={() => props.onMove!(item)}
-                        >
-                          <ArrowUpDown className="h-4 w-4" />
-                          <span className="text-xs">Mover</span>
-                        </Button>
-                      )}
-                      {'onReturn' in props && props.onReturn && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1"
-                          onClick={() => props.onReturn!(item)}
-                        >
-                          <ArrowLeft className="h-4 w-4" />
-                          <span className="text-xs">Devolver</span>
-                        </Button>
-                      )}
-                    </div>
+                    {renderBarActions(item)}
                   </TableCell>
                 </TableRow>
               );
@@ -257,12 +279,12 @@ export function StockTable(props: StockTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Drink</TableHead>
-            <TableHead>Supplier</TableHead>
-            <TableHead>Quantity</TableHead>
-            <TableHead>Unit Cost</TableHead>
-            <TableHead>Ownership</TableHead>
-            <TableHead className="w-[70px]"></TableHead>
+            <TableHead>Insumo</TableHead>
+            <TableHead>Proveedor</TableHead>
+            <TableHead>Cantidad</TableHead>
+            <TableHead>Costo Unit.</TableHead>
+            <TableHead>Propiedad</TableHead>
+            <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -281,12 +303,12 @@ export function StockTable(props: StockTableProps) {
               return (
                 <TableRow key={itemKey}>
                   <TableCell className="font-medium">
-                    {item.drink?.name || `Drink ${item.drinkId}`}
+                    {item.drink?.name || `Insumo ${item.drinkId}`}
                   </TableCell>
                   <TableCell>
-                    {item.supplier?.name || `Supplier ${item.supplierId}`}
+                    {item.supplier?.name || `Proveedor ${item.supplierId}`}
                   </TableCell>
-                  <TableCell>{item.quantity}</TableCell>
+                  <TableCell>{formatStockQuantity(item)}</TableCell>
                   <TableCell>
                     {formatCurrency(item.unitCost, item.currency || 'ARS')}
                   </TableCell>
@@ -294,34 +316,11 @@ export function StockTable(props: StockTableProps) {
                     <Badge
                       variant={item.ownershipMode === 'consignment' ? 'secondary' : 'outline'}
                     >
-                      {item.ownershipMode}
+                      {item.ownershipMode === 'consignment' ? 'Consignación' : 'Comprado'}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      {'onMove' in props && props.onMove && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1"
-                          onClick={() => props.onMove!(item)}
-                        >
-                          <ArrowUpDown className="h-4 w-4" />
-                          <span className="text-xs">Mover</span>
-                        </Button>
-                      )}
-                      {'onReturn' in props && props.onReturn && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1"
-                          onClick={() => props.onReturn!(item)}
-                        >
-                          <ArrowLeft className="h-4 w-4" />
-                          <span className="text-xs">Devolver</span>
-                        </Button>
-                      )}
-                    </div>
+                    {renderBarActions(item)}
                   </TableCell>
                 </TableRow>
               );
@@ -369,37 +368,44 @@ export function StockTable(props: StockTableProps) {
           </Select>
         </div>
 
-        {/* Direct Sale Stock */}
-        <Card className="rounded-2xl">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Package className="h-5 w-5 text-green-600" />
-              Insumos para venta directa
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Se venden como unidad completa (ej: botella de agua)
-            </p>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {renderDirectSaleTable(directSaleItems, 'No hay insumos para venta directa')}
-          </CardContent>
-        </Card>
+        {/* Side by side: Direct Sale + Recipe Stock */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Direct Sale Stock */}
+          <Card className="rounded-2xl flex flex-col">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Package className="h-5 w-5 text-green-600" />
+                Venta directa
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Se venden como unidad completa
+              </p>
+            </CardHeader>
+            <CardContent className="pt-0 flex-1 min-h-0">
+              <div className="max-h-[40vh] overflow-y-auto rounded-lg">
+                {renderDirectSaleTable(directSaleItems, 'No hay insumos para venta directa')}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Recipe Components Stock */}
-        <Card className="rounded-2xl">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Beaker className="h-5 w-5 text-blue-600" />
-              Insumos para recetas
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Se usan como ingredientes en la preparación de cocktails
-            </p>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {renderRecipeTable(recipeItems, 'No hay insumos para recetas')}
-          </CardContent>
-        </Card>
+          {/* Recipe Components Stock */}
+          <Card className="rounded-2xl flex flex-col">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Beaker className="h-5 w-5 text-blue-600" />
+                Para recetas
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Ingredientes para preparar cocktails
+              </p>
+            </CardHeader>
+            <CardContent className="pt-0 flex-1 min-h-0">
+              <div className="max-h-[40vh] overflow-y-auto rounded-lg">
+                {renderRecipeTable(recipeItems, 'No hay insumos para recetas')}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -445,13 +451,13 @@ export function StockTable(props: StockTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Drink</TableHead>
-              <TableHead>Supplier</TableHead>
-              <TableHead>Quantity</TableHead>
-              <TableHead>Available</TableHead>
-              <TableHead>Allocated</TableHead>
-              <TableHead>Unit Cost</TableHead>
-              <TableHead>Ownership</TableHead>
+              <TableHead>Insumo</TableHead>
+              <TableHead>Proveedor</TableHead>
+              <TableHead>Cantidad</TableHead>
+              <TableHead>Disponible</TableHead>
+              <TableHead>Asignada</TableHead>
+              <TableHead>Costo Unit.</TableHead>
+              <TableHead>Propiedad</TableHead>
               <TableHead className="w-[70px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -474,11 +480,11 @@ export function StockTable(props: StockTableProps) {
                 return (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">
-                      {drink?.name || `Drink ${item.drinkId}`}
+                      {drink?.name || `Insumo ${item.drinkId}`}
                     </TableCell>
                     <TableCell>
                       {supplier?.name ||
-                        (item.supplierId ? `Supplier ${item.supplierId}` : 'Sin proveedor')}
+                        (item.supplierId ? `Proveedor ${item.supplierId}` : 'Sin proveedor')}
                     </TableCell>
                     <TableCell>{item.totalQuantity}</TableCell>
                     <TableCell>
@@ -496,7 +502,7 @@ export function StockTable(props: StockTableProps) {
                       <Badge
                         variant={item.ownershipMode === 'consignment' ? 'secondary' : 'outline'}
                       >
-                        {item.ownershipMode}
+                        {item.ownershipMode === 'consignment' ? 'Consignación' : 'Comprado'}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -504,7 +510,7 @@ export function StockTable(props: StockTableProps) {
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
                             <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Open menu</span>
+                            <span className="sr-only">Abrir menú</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">

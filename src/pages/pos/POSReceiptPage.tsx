@@ -46,10 +46,10 @@ export function POSReceiptPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
-          <p className="text-gray-600 mb-4">Unable to load receipt</p>
+          <p className="text-gray-600 mb-4">No se pudo cargar el recibo</p>
           <Button variant="outline" onClick={() => window.history.back()}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Go Back
+            Volver
           </Button>
         </div>
       </div>
@@ -62,11 +62,11 @@ export function POSReceiptPage() {
       <div className="print:hidden max-w-md mx-auto mb-4 flex gap-2 px-4">
         <Button variant="outline" onClick={() => window.history.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+          Volver
         </Button>
         <Button onClick={handlePrint} className="flex-1">
           <Printer className="h-4 w-4 mr-2" />
-          Print Receipt
+          Imprimir Recibo
         </Button>
       </div>
 
@@ -83,16 +83,16 @@ export function POSReceiptPage() {
           {/* Receipt Info */}
           <div className="text-sm text-gray-600 space-y-1 border-b border-dashed pb-4">
             <div className="flex justify-between">
-              <span>Receipt #:</span>
+              <span>Recibo #:</span>
               <span className="font-mono">{receipt.receiptNumber}</span>
             </div>
             <div className="flex justify-between">
-              <span>Date:</span>
+              <span>Fecha:</span>
               <span>{formatDate(receipt.createdAt)}</span>
             </div>
             {receipt.cashierName && (
               <div className="flex justify-between">
-                <span>Cashier:</span>
+                <span>Cajero:</span>
                 <span>{receipt.cashierName}</span>
               </div>
             )}
@@ -100,7 +100,7 @@ export function POSReceiptPage() {
 
           {/* Items */}
           <div className="space-y-2 border-b border-dashed pb-4">
-            <h3 className="font-semibold text-sm uppercase text-gray-500">Items</h3>
+            <h3 className="font-semibold text-sm uppercase text-gray-500">Artículos</h3>
             {receipt.items.map((item, index) => (
               <div key={index} className="flex justify-between text-sm">
                 <div>
@@ -120,13 +120,13 @@ export function POSReceiptPage() {
             </div>
             {receipt.tax > 0 && (
               <div className="flex justify-between text-sm">
-                <span>Tax</span>
+                <span>Impuesto</span>
                 <span>{formatCurrency(receipt.tax)}</span>
               </div>
             )}
             {receipt.discount > 0 && (
               <div className="flex justify-between text-sm text-green-600">
-                <span>Discount</span>
+                <span>Descuento</span>
                 <span>-{formatCurrency(receipt.discount)}</span>
               </div>
             )}
@@ -139,15 +139,15 @@ export function POSReceiptPage() {
           {/* Payment Method */}
           <div className="text-center text-sm text-gray-600 border-t border-dashed pt-4">
             <p className="uppercase font-medium">
-              Paid by {receipt.paymentMethod}
+              Pagado con {receipt.paymentMethod}
             </p>
           </div>
 
           {/* Footer */}
           <div className="text-center text-xs text-gray-400 pt-4">
-            <p>Thank you for your purchase!</p>
+            <p>¡Gracias por tu compra!</p>
             <p className="mt-2">
-              Sale ID: {receipt.saleId}
+              Venta #{receipt.saleId}
             </p>
           </div>
 

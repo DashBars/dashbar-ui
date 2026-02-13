@@ -32,10 +32,11 @@ export function useCreateSupplier() {
     mutationFn: (dto: CreateSupplierDto) => suppliersApi.create(dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: suppliersKeys.list() });
-      toast.success('Supplier created successfully');
+      toast.success('Proveedor creado correctamente');
     },
-    onError: (error: Error) => {
-      toast.error(`Error creating supplier: ${error.message}`);
+    onError: (error: any) => {
+      const msg = error?.response?.data?.message || error.message || 'Error al crear el proveedor';
+      toast.error(msg);
     },
   });
 }
@@ -47,10 +48,11 @@ export function useUpdateSupplier(id: number) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: suppliersKeys.list() });
       queryClient.invalidateQueries({ queryKey: suppliersKeys.detail(id) });
-      toast.success('Supplier updated successfully');
+      toast.success('Proveedor actualizado correctamente');
     },
-    onError: (error: Error) => {
-      toast.error(`Error updating supplier: ${error.message}`);
+    onError: (error: any) => {
+      const msg = error?.response?.data?.message || error.message || 'Error al actualizar el proveedor';
+      toast.error(msg);
     },
   });
 }
@@ -61,10 +63,11 @@ export function useDeleteSupplier() {
     mutationFn: (id: number) => suppliersApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: suppliersKeys.list() });
-      toast.success('Supplier deleted successfully');
+      toast.success('Proveedor eliminado');
     },
-    onError: (error: Error) => {
-      toast.error(`Error deleting supplier: ${error.message}`);
+    onError: (error: any) => {
+      const msg = error?.response?.data?.message || error.message || 'Error al eliminar el proveedor';
+      toast.error(msg);
     },
   });
 }

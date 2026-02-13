@@ -26,7 +26,7 @@ export function LoginPage() {
       <div className="min-h-screen flex items-center justify-center bg-muted/40">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <p className="text-sm text-muted-foreground">Cargando...</p>
         </div>
       </div>
     );
@@ -41,7 +41,7 @@ export function LoginPage() {
       await login(email, password);
       // Navigation is handled by AuthContext
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Invalid credentials';
+      const errorMessage = err.response?.data?.message || 'Credenciales inválidas';
       setError(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -52,15 +52,15 @@ export function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Sign in</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Iniciar sesión</CardTitle>
           <CardDescription className="text-center">
-            Enter your email and password to access DashBar
+            Ingresá tu email y contraseña para acceder a DashBar
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Correo electrónico</Label>
               <Input
                 id="email"
                 type="email"
@@ -73,11 +73,11 @@ export function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Contraseña</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
+                placeholder="Ingresá tu contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -98,18 +98,18 @@ export function LoginPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
+                  Iniciando sesión...
                 </>
               ) : (
-                'Sign in'
+                'Iniciar sesión'
               )}
             </Button>
           </form>
           <div className="mt-6 text-xs text-muted-foreground text-center space-y-1">
-            <p>Test credentials:</p>
-            <p>Manager: owner@dashbar.com / password123</p>
-            <p>Cashier: cashier@dashbar.com / password123</p>
-            <p>Admin: admin@dashbar.com / password123</p>
+            <p>Credenciales de prueba:</p>
+            <p>Gerente: owner@dashbar.com / password123</p>
+            <p>Cajero: cashier@dashbar.com / password123</p>
+            <p>Administrador: admin@dashbar.com / password123</p>
           </div>
         </CardContent>
       </Card>

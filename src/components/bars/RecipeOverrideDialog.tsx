@@ -85,19 +85,19 @@ export function RecipeOverrideDialog({
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>
-              {isEdit ? 'Edit Recipe Override' : 'Create Recipe Override'}
+              {isEdit ? 'Editar ajuste de receta' : 'Crear ajuste de receta'}
             </DialogTitle>
             <DialogDescription>
               {isEdit
-                ? 'Update the recipe override percentage.'
-                : 'Create a recipe override for this bar.'}
+                ? 'Actualizá el porcentaje del override de receta.'
+                : 'Creá un override de receta para esta barra.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             {!isEdit && (
               <>
                 <div className="grid gap-2">
-                  <Label htmlFor="cocktailId">Cocktail ID</Label>
+                  <Label htmlFor="cocktailId">ID del trago</Label>
                   <Input
                     id="cocktailId"
                     type="number"
@@ -105,11 +105,11 @@ export function RecipeOverrideDialog({
                     value={cocktailId || ''}
                     onChange={(e) => setCocktailId(parseInt(e.target.value) || 0)}
                     required
-                    placeholder="Cocktail ID"
+                    placeholder="ID del trago"
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="drinkId">Drink ID</Label>
+                  <Label htmlFor="drinkId">ID del Insumo</Label>
                   <Input
                     id="drinkId"
                     type="number"
@@ -117,13 +117,13 @@ export function RecipeOverrideDialog({
                     value={drinkId || ''}
                     onChange={(e) => setDrinkId(parseInt(e.target.value) || 0)}
                     required
-                    placeholder="Drink ID"
+                    placeholder="ID del Insumo"
                   />
                 </div>
               </>
             )}
             <div className="grid gap-2">
-              <Label htmlFor="cocktailPercentage">Cocktail Percentage (%)</Label>
+              <Label htmlFor="cocktailPercentage">Porcentaje del trago (%)</Label>
               <Input
                 id="cocktailPercentage"
                 type="number"
@@ -142,13 +142,13 @@ export function RecipeOverrideDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button
               type="submit"
               disabled={createOverride.isPending || updateOverride.isPending}
             >
-              {isEdit ? 'Update' : 'Create'}
+              {isEdit ? 'Actualizar' : 'Crear'}
             </Button>
           </DialogFooter>
         </form>

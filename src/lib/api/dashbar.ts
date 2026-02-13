@@ -6,6 +6,7 @@ import type {
   UpdateBarDto,
   Stock,
   StockSummary,
+  BarStockDrink,
   UpsertStockDto,
   BulkUpsertStockDto,
   RecipeOverride,
@@ -41,6 +42,8 @@ import type {
   AssignStockDto,
   MoveStockDto,
   ReturnStockDto,
+  BulkReturnStockDto,
+  BulkReturnResult,
   EventRecipe,
   CreateRecipeDto,
   UpdateRecipeDto,
@@ -61,6 +64,9 @@ import type {
   POSSale,
   CreatePOSSaleDto,
   ReceiptData,
+  DashboardTotals,
+  TimeSeriesResponse,
+  TopProductsResponse,
 } from './types';
 
 // Configure axios base URL - adjust this to match your backend URL
@@ -96,7 +102,7 @@ api.interceptors.response.use(
       if (!isRedirecting && !window.location.pathname.includes('/login')) {
         isRedirecting = true;
         const currentPath = window.location.pathname + window.location.search;
-        toast.error('Session expired. Please log in again.');
+        toast.error('Sesión expirada. Iniciá sesión nuevamente.');
         setTimeout(() => {
           window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
         }, 100);
@@ -168,6 +174,28 @@ export const stockApi = {
   ): Promise<StockSummary[]> => {
     const response = await api.get<StockSummary[]>(
       `/events/${eventId}/bars/${barId}/stock/summary`,
+    );
+    return response.data;
+  },
+
+  /** Get unique drinks available in a bar's stock (for recipe ingredient selection) */
+  getStockDrinks: async (
+    eventId: number,
+    barId: number,
+  ): Promise<BarStockDrink[]> => {
+    const response = await api.get<BarStockDrink[]>(
+      `/events/${eventId}/bars/${barId}/stock/drinks`,
+    );
+    return response.data;
+  },
+
+  /** Get unique recipe drinks across all bars of a given type in an event */
+  getDrinksByBarType: async (
+    eventId: number,
+    barType: string,
+  ): Promise<BarStockDrink[]> => {
+    const response = await api.get<BarStockDrink[]>(
+      `/events/${eventId}/stock/drinks-by-type/${barType}`,
     );
     return response.data;
   },
@@ -682,6 +710,14 @@ export const stockMovementsApi = {
     const response = await api.post('/stock/return', dto);
     return response.data;
   },
+  returnToSupplier: async (dto: ReturnStockDto) => {
+    const response = await api.post('/stock/return-to-supplier', dto);
+    return response.data;
+  },
+  bulkReturn: async (dto: BulkReturnStockDto): Promise<BulkReturnResult> => {
+    const response = await api.post('/stock/bulk-return', dto);
+    return response.data;
+  },
 };
 
 // Venues API
@@ -785,6 +821,8 @@ export const posDeviceApi = {
           name: string;
           price: number;
           isCombo: boolean;
+          cocktailId?: number;
+          stockLevel?: number;
           glassVolume?: number;
           hasIce?: boolean;
           components?: Array<{
@@ -808,7 +846,9 @@ export const posDeviceApi = {
       id: product.id,
       name: product.name,
       price: product.price,
-      available: true,
+      available: product.stockLevel === undefined || product.stockLevel > 0,
+      stockLevel: product.stockLevel,
+      cocktailId: product.cocktailId,
       category: product.isCombo ? 'Combos' : undefined,
       glassVolume: product.glassVolume,
       hasIce: product.hasIce,
@@ -968,6 +1008,12 @@ export const reportsApi = {
     return response.data;
   },
 
+  // Send report via email
+  sendReportEmail: async (eventId: number, recipients: string[]): Promise<{ message: string }> => {
+    const response = await api.post(`/events/${eventId}/report/send-email`, { recipients });
+    return response.data;
+  },
+
   // Get events eligible for comparison
   getEligibleForComparison: async (): Promise<EligibleEventForComparison[]> => {
     const response = await api.get<EligibleEventForComparison[]>('/reports/comparison/eligible');
@@ -977,6 +1023,42 @@ export const reportsApi = {
   // Generate comparison report for multiple events
   generateComparison: async (eventIds: number[]): Promise<EventComparisonReport> => {
     const response = await api.post<EventComparisonReport>('/reports/comparison', { eventIds });
+    return response.data;
+  },
+};
+
+// ── Dashboard / Monitoring API ──
+
+export const dashboardApi = {
+  /** Get aggregated sales + consumption totals for an event */
+  getTotals: async (eventId: number): Promise<DashboardTotals> => {
+    const response = await api.get<DashboardTotals>(
+      `/events/${eventId}/dashboard/totals`,
+    );
+    return response.data;
+  },
+
+  /** Get time-series sales data (bucketed) */
+  getTimeSeries: async (
+    eventId: number,
+    bucket: string = '5m',
+  ): Promise<TimeSeriesResponse> => {
+    const response = await api.get<TimeSeriesResponse>(
+      `/events/${eventId}/dashboard/time-series`,
+      { params: { bucket } },
+    );
+    return response.data;
+  },
+
+  /** Get top products by units sold */
+  getTopProducts: async (
+    eventId: number,
+    limit: number = 5,
+  ): Promise<TopProductsResponse> => {
+    const response = await api.get<TopProductsResponse>(
+      `/events/${eventId}/dashboard/top-products`,
+      { params: { limit } },
+    );
     return response.data;
   },
 };
