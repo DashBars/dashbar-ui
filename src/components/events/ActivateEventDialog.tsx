@@ -19,6 +19,8 @@ import { Play, Loader2, AlertTriangle } from 'lucide-react';
 interface RecipeWarning {
   recipeName: string;
   barType: string;
+  barId: number;
+  barName: string;
   missingDrinks: string[];
 }
 
@@ -148,11 +150,13 @@ export function ActivateEventDialog({
                 </p>
                 <ul className="text-xs text-amber-700 space-y-0.5 mt-1">
                   {recipeWarnings.map((w) => (
-                    <li key={`${w.recipeName}-${w.barType}`}>
+                    <li key={`${w.recipeName}-${w.barId}`}>
                       <span className="font-medium">{w.recipeName}</span>
-                      {' en barras '}
-                      <span className="font-medium capitalize">{w.barType}</span>
-                      {': faltan '}
+                      {' en '}
+                      <span className="font-medium">{w.barName}</span>
+                      {' ('}
+                      <span className="capitalize">{w.barType}</span>
+                      {'): faltan '}
                       {w.missingDrinks.join(', ')}
                     </li>
                   ))}

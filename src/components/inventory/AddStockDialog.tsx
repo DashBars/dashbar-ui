@@ -165,6 +165,7 @@ export function AddStockDialog({
 
   const isSubmitting = isCreating || isUpdating;
   const selectedDrink = drinks.find((d) => d.id.toString() === drinkId);
+  const canSubmit = isEdit || (!!drinkId && drinkId !== '' && !isNaN(parseInt(drinkId, 10)));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -231,11 +232,15 @@ export function AddStockDialog({
                       ))}
                     </div>
                   )}
-                  {selectedDrink && (
+                  {selectedDrink ? (
                     <p className="text-xs text-muted-foreground">
                       Marca: {selectedDrink.brand} | Volumen: {selectedDrink.volume}ml | SKU: {selectedDrink.sku}
                     </p>
-                  )}
+                  ) : drinkSearch.trim() && !drinkId ? (
+                    <p className="text-xs text-destructive">
+                      Seleccioná un insumo de la lista desplegable
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-2 relative">
                   <Label htmlFor="supplierSearch">Proveedor</Label>
@@ -393,7 +398,7 @@ export function AddStockDialog({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || !canSubmit}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

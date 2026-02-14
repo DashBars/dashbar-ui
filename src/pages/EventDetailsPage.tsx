@@ -107,60 +107,44 @@ export function EventDetailsPage() {
   const [editingBar, setEditingBar] = useState<Bar | null>(null);
   const [stockWizardOpen, setStockWizardOpen] = useState(false);
 
-  // Compute recipe ingredient warnings per bar type at the event level
+  // Compute recipe ingredient warnings PER BAR at the event level
+  // Each bar of a given type is checked individually
   const eventRecipeWarnings = useMemo(() => {
     if (!bars || !eventRecipes.length) return [];
-    const warnings: Array<{ recipeName: string; barType: string; missingDrinks: string[] }> = [];
+    const warnings: Array<{ recipeName: string; barType: string; barId: number; barName: string; missingDrinks: string[] }> = [];
 
     for (const recipe of eventRecipes) {
       const isDirectSale = recipe.components.length === 1 && recipe.components[0].percentage === 100;
       if (isDirectSale) continue;
 
       for (const barType of recipe.barTypes) {
-        // Find all bars of this type
+        // Check EVERY bar of this type individually
         const typeBars = bars.filter((b) => b.type === barType);
-        if (typeBars.length === 0) continue;
 
-        // Check if ANY bar of this type has all required ingredients
-        const anyBarHasAll = typeBars.some((bar) => {
-          return recipe.components.every((comp) => {
-            return (bar.stocks || []).some(
-              (s) => !s.sellAsWholeUnit && s.drinkId === comp.drinkId && s.quantity > 0,
-            );
-          });
-        });
-
-        if (!anyBarHasAll) {
-          // Find which drinks are missing across all bars of this type
-          const allTypeStocks = typeBars.flatMap((b) => b.stocks || []);
+        for (const bar of typeBars) {
           const missingDrinks: string[] = [];
           for (const comp of recipe.components) {
-            const hasIt = allTypeStocks.some(
+            const hasIngredient = (bar.stocks || []).some(
               (s) => !s.sellAsWholeUnit && s.drinkId === comp.drinkId && s.quantity > 0,
             );
-            if (!hasIt && comp.drink?.name) {
+            if (!hasIngredient && comp.drink?.name) {
               missingDrinks.push(comp.drink.name);
             }
           }
           if (missingDrinks.length > 0) {
-            warnings.push({ recipeName: recipe.cocktailName, barType, missingDrinks });
+            warnings.push({
+              recipeName: recipe.cocktailName,
+              barType,
+              barId: bar.id,
+              barName: bar.name,
+              missingDrinks,
+            });
           }
         }
       }
     }
     return warnings;
   }, [bars, eventRecipes]);
-
-  // Map from bar type to list of bars for CTA navigation
-  const barsByType = useMemo(() => {
-    if (!bars) return {};
-    const map: Record<string, Array<{ barId: number; barName: string }>> = {};
-    for (const bar of bars) {
-      if (!map[bar.type]) map[bar.type] = [];
-      map[bar.type].push({ barId: bar.id, barName: bar.name });
-    }
-    return map;
-  }, [bars]);
 
   const filteredBars = useMemo(() => {
     if (!bars) return [];
@@ -385,7 +369,6 @@ export function EventDetailsPage() {
             isEditable={status === 'upcoming'}
             hasBars={(bars || []).length > 0}
             recipeWarnings={eventRecipeWarnings}
-            barsByType={barsByType}
           />
           <BarsSummaryCards bars={bars || []} isLoading={isLoadingBars} />
           <BarsFilters

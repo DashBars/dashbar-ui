@@ -5,6 +5,8 @@ import { Link, useNavigate } from 'react-router-dom';
 export interface RecipeWarning {
   recipeName: string;
   barType: string;
+  barId: number;
+  barName: string;
   missingDrinks: string[];
 }
 
@@ -16,8 +18,6 @@ interface BarsPageHeaderProps {
   isEditable?: boolean;
   hasBars?: boolean;
   recipeWarnings?: RecipeWarning[];
-  /** Map from barType to array of { barId, barName } for CTA navigation */
-  barsByType?: Record<string, Array<{ barId: number; barName: string }>>;
 }
 
 export function BarsPageHeader({
@@ -28,7 +28,6 @@ export function BarsPageHeader({
   isEditable = true,
   hasBars = false,
   recipeWarnings = [],
-  barsByType = {},
 }: BarsPageHeaderProps) {
   const navigate = useNavigate();
   return (
@@ -93,30 +92,26 @@ export function BarsPageHeader({
                 Recetas sin insumos completos — no se puede activar el evento
               </p>
               <ul className="text-xs text-amber-700 space-y-1">
-                {recipeWarnings.map((w) => {
-                  const typeBars = barsByType[w.barType] || [];
-                  return (
-                    <li key={`${w.recipeName}-${w.barType}`} className="flex items-start justify-between gap-2">
-                      <span>
-                        <span className="font-medium">{w.recipeName}</span>
-                        {' en barras '}
-                        <span className="font-medium capitalize">{w.barType}</span>
-                        {': faltan '}
-                        {w.missingDrinks.join(', ')}
-                      </span>
-                      {typeBars.length > 0 && (
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 text-amber-800 hover:text-amber-950 font-medium whitespace-nowrap shrink-0"
-                          onClick={() => navigate(`/events/${eventId}/bars/${typeBars[0].barId}?tab=stock`)}
-                        >
-                          Cargar stock
-                          <ArrowRight className="h-3 w-3" />
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
+                {recipeWarnings.map((w) => (
+                  <li key={`${w.recipeName}-${w.barId}`} className="flex items-start justify-between gap-2">
+                    <span>
+                      <span className="font-medium">{w.recipeName}</span>
+                      {' en '}
+                      <span className="font-medium">{w.barName}</span>
+                      <span className="text-amber-600"> ({w.barType})</span>
+                      {': faltan '}
+                      {w.missingDrinks.join(', ')}
+                    </span>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-amber-800 hover:text-amber-950 font-medium whitespace-nowrap shrink-0"
+                      onClick={() => navigate(`/events/${eventId}/bars/${w.barId}?tab=stock`)}
+                    >
+                      Cargar stock
+                      <ArrowRight className="h-3 w-3" />
+                    </button>
+                  </li>
+                ))}
               </ul>
             </div>
           </div>

@@ -8,6 +8,8 @@ import { Wine, Monitor, ShoppingBag, Beaker, ChevronRight, AlertTriangle } from 
 export interface BarRecipeWarning {
   recipeName: string;
   barType: string;
+  barId: number;
+  barName: string;
   missingDrinks: string[];
 }
 
@@ -67,8 +69,8 @@ export function BarsTable(props: BarsTableProps) {
         const directSaleCount = stocks.filter((s) => s.sellAsWholeUnit).length;
         const recipeCount = stocks.filter((s) => !s.sellAsWholeUnit).length;
 
-        // Warnings for this specific bar's type
-        const barWarnings = recipeWarnings.filter((w) => w.barType === bar.type);
+        // Warnings for this specific bar
+        const barWarnings = recipeWarnings.filter((w) => w.barId === bar.id);
 
         return (
           <Card
