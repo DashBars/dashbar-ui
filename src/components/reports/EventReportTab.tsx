@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { reportsApi } from '@/lib/api/dashbar';
 import type { EventReportData, BucketSize } from '@/lib/api/types';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ import {
   Package,
   Mail,
   X,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -37,6 +38,7 @@ interface EventReportTabProps {
 export function EventReportTab({ eventId, eventName }: EventReportTabProps) {
   const [selectedBucket, setSelectedBucket] = useState<BucketSize>(15);
   const [isExporting, setIsExporting] = useState<'pdf' | null>(null);
+  const queryClient = useQueryClient();
 
   // Fetch report data
   const {
@@ -47,6 +49,18 @@ export function EventReportTab({ eventId, eventName }: EventReportTabProps) {
     queryKey: ['report', eventId],
     queryFn: () => reportsApi.getReport(eventId),
     retry: false,
+  });
+
+  // Generate report mutation
+  const generateReport = useMutation({
+    mutationFn: () => reportsApi.generateReport(eventId),
+    onSuccess: () => {
+      toast.success('Reporte generado correctamente');
+      queryClient.invalidateQueries({ queryKey: ['report', eventId] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Error al generar el reporte');
+    },
   });
 
   // PDF download with retry
@@ -152,8 +166,20 @@ export function EventReportTab({ eventId, eventName }: EventReportTabProps) {
         <h3 className="text-xl font-semibold">No hay reporte disponible</h3>
         <p className="text-muted-foreground text-center max-w-md">
           El reporte se genera automáticamente al finalizar el evento.
-          Si no aparece, es posible que no haya datos de ventas suficientes.
+          Si no aparece, podés generarlo manualmente.
         </p>
+        <Button
+          onClick={() => generateReport.mutate()}
+          disabled={generateReport.isPending}
+          className="gap-2"
+        >
+          {generateReport.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
+          Generar reporte
+        </Button>
       </div>
     );
   }
