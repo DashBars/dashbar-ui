@@ -617,14 +617,19 @@ export function POSKioskPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Artículos</span>
-                  <span>{lastSale.items.length}</span>
+                  <span>{lastSale.items.reduce((sum, item) => sum + item.quantity, 0)}</span>
                 </div>
                 <div className="border-t my-2" />
                 {lastSale.items.map((item) => (
                   <div key={item.id} className="flex justify-between text-sm">
-                    <span>
-                      {item.quantity}x {item.productName}
-                    </span>
+                    <div>
+                      <span>{item.quantity}x {item.productName}</span>
+                      {item.quantity > 1 && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          ({formatCurrency(item.unitPrice)} c/u)
+                        </span>
+                      )}
+                    </div>
                     <span>{formatCurrency(item.lineTotal)}</span>
                   </div>
                 ))}

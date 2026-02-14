@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   DollarSign,
   Package,
@@ -12,10 +12,15 @@ import {
   Clock,
   BarChart3,
   Store,
+  ChevronDown,
+  ChevronUp,
+  List,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { useBars } from '@/hooks/useBars';
 import { useEventPosnets } from '@/hooks/usePosnets';
 import { useEventDashboard } from '@/hooks/useEventDashboard';
@@ -162,6 +167,107 @@ function LiveSalesFeed({ sales, bars }: { sales: RecentSale[]; bars: Bar[] }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function SalesTable({ sales, bars }: { sales: RecentSale[]; bars: Bar[] }) {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  const barNameMap = useMemo(() => {
+    const map = new Map<number, string>();
+    bars.forEach((b) => map.set(b.id, b.name));
+    return map;
+  }, [bars]);
+
+  const barColorMap = useMemo(() => {
+    const colors = [
+      'bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500',
+      'bg-rose-500', 'bg-cyan-500', 'bg-orange-500', 'bg-pink-500',
+    ];
+    const map = new Map<number, string>();
+    bars.forEach((b, i) => map.set(b.id, colors[i % colors.length]));
+    return map;
+  }, [bars]);
+
+  if (sales.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+        <ShoppingCart className="h-8 w-8 mb-2 opacity-40" />
+        <p className="text-sm">Esperando ventas...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs text-muted-foreground">
+          Mostrando {sales.length} venta{sales.length !== 1 ? 's' : ''} reciente{sales.length !== 1 ? 's' : ''}
+        </p>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1 text-xs"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          {isExpanded ? (
+            <>
+              <ChevronUp className="h-3.5 w-3.5" />
+              Colapsar
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-3.5 w-3.5" />
+              Expandir
+            </>
+          )}
+        </Button>
+      </div>
+      {isExpanded && (
+        <div className="rounded-md border max-h-[400px] overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40%]">Producto</TableHead>
+                <TableHead>Barra</TableHead>
+                <TableHead className="text-center">Cant.</TableHead>
+                <TableHead className="text-right">Monto</TableHead>
+                <TableHead className="text-right">Hora</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sales.map((sale, idx) => (
+                <TableRow
+                  key={`${sale.id}-${idx}`}
+                  className="animate-in slide-in-from-top-1 duration-200"
+                >
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full shrink-0 ${barColorMap.get(sale.barId) || 'bg-gray-400'}`} />
+                      {sale.cocktailName}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {sale.barName || barNameMap.get(sale.barId) || 'Barra'}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="secondary" className="text-xs">
+                      x{sale.quantity}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-semibold">
+                    {formatCurrency(sale.totalAmount)}
+                  </TableCell>
+                  <TableCell className="text-right text-xs text-muted-foreground">
+                    {new Date(sale.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }
@@ -415,47 +521,46 @@ export function EventMonitoringTab({ eventId }: EventMonitoringTabProps) {
         />
       </div>
 
-      {/* Row 2: Live Sales + Top Products */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="rounded-2xl">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Ventas en tiempo real
-              {recentSales.length > 0 && (
-                <Badge variant="secondary" className="text-[10px] ml-auto">
-                  {recentSales.length}
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <LiveSalesFeed sales={recentSales} bars={bars} />
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Top productos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-8 w-full rounded" />
-                ))}
-              </div>
-            ) : (
-              <TopProductsList products={topProducts} />
+      {/* Row 2: Sales Table (full width, collapsible) */}
+      <Card className="rounded-2xl">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <List className="h-4 w-4" />
+            Registro de ventas
+            {recentSales.length > 0 && (
+              <Badge variant="secondary" className="text-[10px] ml-auto">
+                {recentSales.length}
+              </Badge>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SalesTable sales={recentSales} bars={bars} />
+        </CardContent>
+      </Card>
 
-      {/* Row 3: Bar Status + POS Status */}
+      {/* Row 3: Top Products */}
+      <Card className="rounded-2xl">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Top productos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full rounded" />
+              ))}
+            </div>
+          ) : (
+            <TopProductsList products={topProducts} />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Row 4: Bar Status + POS Status */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="rounded-2xl">
           <CardHeader className="pb-3">
@@ -504,7 +609,7 @@ export function EventMonitoringTab({ eventId }: EventMonitoringTabProps) {
         </Card>
       </div>
 
-      {/* Row 4: Alerts */}
+      {/* Row 5: Alerts */}
       <Card className="rounded-2xl">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">

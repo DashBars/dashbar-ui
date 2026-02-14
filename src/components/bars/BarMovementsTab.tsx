@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useInventoryMovements } from '@/hooks/useInventoryMovements';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SortableTableHead, useTableSort, sortItems } from '@/components/ui/sortable-table-head';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { PackagePlus, PackageMinus, ArrowLeftRight, ShoppingCart, Wrench, CornerUpLeft, Package, Beaker } from 'lucide-react';
@@ -57,9 +58,13 @@ function getMovementDescription(movement: InventoryMovement): { text: string; ic
       };
     case 'ADJUSTMENT':
       return {
-        text: 'Ajuste manual',
+        text: movement.notes?.toLowerCase().includes('descarte')
+          ? 'Descarte de remanente'
+          : 'Ajuste manual',
         icon: <Wrench className="h-4 w-4" />,
-        iconColor: 'text-gray-600',
+        iconColor: movement.notes?.toLowerCase().includes('descarte')
+          ? 'text-amber-600'
+          : 'text-gray-600',
       };
     case 'RETURN_TO_PROVIDER':
       return {
@@ -111,10 +116,34 @@ function getPurposeBadge(movement: InventoryMovement) {
 
 export function BarMovementsTab({ eventId, barId }: BarMovementsTabProps) {
   const { data: movements = [], isLoading, error } = useInventoryMovements(eventId, barId);
+  const { sortKey, sortDir, handleSort } = useTableSort();
 
   const grouped = useMemo(() => {
     return movements;
   }, [movements]);
+
+  const sortGetters = useMemo(
+    () => ({
+      date: (item: InventoryMovement) => new Date(item.createdAt).getTime(),
+      drink: (item: InventoryMovement) => item.drink?.name?.toLowerCase() ?? '',
+      supplier: (item: InventoryMovement) => item.supplier?.name?.toLowerCase() ?? '',
+      purpose: (item: InventoryMovement) =>
+        item.sellAsWholeUnit === true
+          ? 'venta directa'
+          : item.sellAsWholeUnit === false
+            ? 'para recetas'
+            : '',
+      quantity: (item: InventoryMovement) => Math.abs(item.quantity),
+      movement: (item: InventoryMovement) => getMovementDescription(item).text.toLowerCase(),
+      notes: (item: InventoryMovement) => (item.notes?.toLowerCase() ?? ''),
+    }),
+    [],
+  );
+
+  const sortedItems = useMemo(
+    () => sortItems(grouped, sortKey, sortDir, sortGetters),
+    [grouped, sortKey, sortDir, sortGetters],
+  );
 
   return (
     <div className="space-y-4">
@@ -141,17 +170,31 @@ export function BarMovementsTab({ eventId, barId }: BarMovementsTabProps) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Insumo</TableHead>
-                    <TableHead>Proveedor</TableHead>
-                    <TableHead>Destino</TableHead>
-                    <TableHead>Cantidad</TableHead>
-                    <TableHead>Movimiento</TableHead>
-                    <TableHead>Notas</TableHead>
+                    <SortableTableHead sortKey="date" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                      Fecha
+                    </SortableTableHead>
+                    <SortableTableHead sortKey="drink" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                      Insumo
+                    </SortableTableHead>
+                    <SortableTableHead sortKey="supplier" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                      Proveedor
+                    </SortableTableHead>
+                    <SortableTableHead sortKey="purpose" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                      Destino
+                    </SortableTableHead>
+                    <SortableTableHead sortKey="quantity" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                      Cantidad
+                    </SortableTableHead>
+                    <SortableTableHead sortKey="movement" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                      Movimiento
+                    </SortableTableHead>
+                    <SortableTableHead sortKey="notes" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                      Notas
+                    </SortableTableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {grouped.map((movement) => {
+                  {sortedItems.map((movement) => {
                     const description = getMovementDescription(movement);
                     const purposeBadge = getPurposeBadge(movement);
                     return (

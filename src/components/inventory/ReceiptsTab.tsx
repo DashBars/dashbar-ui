@@ -145,7 +145,9 @@ export function ReceiptsTab({ eventId, barId }: ReceiptsTabProps) {
                   <TableCell>{movement.quantity}</TableCell>
                   <TableCell>
                     <Badge variant="outline">
-                      {movement.type === 'adjustment' ? 'Ajuste' : 'Comprobante'}
+                      {movement.type === 'adjustment'
+                        ? (movement.notes?.toLowerCase().includes('descarte') ? 'Descarte' : 'Ajuste')
+                        : 'Comprobante'}
                     </Badge>
                   </TableCell>
                   <TableCell>

@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils/cn';
 interface EventRecipesTabProps {
   eventId: number;
   isEditable: boolean;
+  showWarnings?: boolean;
   onNavigateToBarras?: () => void;
 }
 
@@ -31,7 +32,7 @@ const barTypeLabels: Record<BarType, string> = {
   lounge: 'Lounge',
 };
 
-export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: EventRecipesTabProps) {
+export function EventRecipesTab({ eventId, isEditable, showWarnings = true, onNavigateToBarras }: EventRecipesTabProps) {
   const { data: recipes = [], isLoading } = useEventRecipes(eventId);
   const { data: bars = [] } = useBars(eventId);
   const createRecipe = useCreateRecipe(eventId);
@@ -46,8 +47,8 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
   // Stepper state (3 steps)
   const [step, setStep] = useState(1);
 
-  // Step 1: Bar type + basic info
-  const [selectedBarType, setSelectedBarType] = useState<BarType | ''>('');
+  // Step 1: Bar type(s) + basic info
+  const [selectedBarTypes, setSelectedBarTypes] = useState<Set<BarType>>(new Set());
   const [cocktailName, setCocktailName] = useState('');
   const [glassVolume, setGlassVolume] = useState('');
   const [hasIce, setHasIce] = useState(false);
@@ -60,10 +61,11 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
 
   const updateRecipe = useUpdateRecipe(eventId, editingRecipe?.id || 0);
 
-  // Get recipe drinks aggregated across all bars of the selected type
+  // For ingredient list, use the first selected bar type
+  const primaryBarType = Array.from(selectedBarTypes)[0] || '';
   const { data: barTypeDrinks = [], isLoading: isLoadingDrinks } = useBarTypeDrinks(
     eventId,
-    selectedBarType,
+    primaryBarType,
   );
 
   // Derive which bar types actually exist in this event
@@ -73,10 +75,12 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
     return ALL_BAR_TYPES.filter((t) => types.has(t));
   }, [bars]);
 
-  // Get unique cocktail names from existing recipes in this event only
+  // Get unique cocktail names from existing real recipes (exclude direct-sale products)
   const existingCocktailNames = useMemo(() => {
     const names = new Set<string>();
-    recipes.forEach((r) => names.add(r.cocktailName));
+    recipes
+      .filter((r) => !(r.components.length === 1 && r.components[0].percentage === 100))
+      .forEach((r) => names.add(r.cocktailName));
     return Array.from(names).sort();
   }, [recipes]);
 
@@ -149,8 +153,8 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
           percentage: c.percentage.toString(),
         })),
       );
-      // Pre-select the bar type from the recipe
-      setSelectedBarType(recipe.barTypes.length > 0 ? recipe.barTypes[0] : '');
+      // Pre-select the bar types from the recipe
+      setSelectedBarTypes(new Set(recipe.barTypes as BarType[]));
 
       // Direct-sale products: skip to price step (only editable field)
       const isDirectSaleRecipe = recipe.components.length === 1 && recipe.components[0].percentage === 100;
@@ -161,7 +165,7 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
       setGlassVolume('');
       setSalePrice('');
       setHasIce(false);
-      setSelectedBarType('');
+      setSelectedBarTypes(new Set());
       setComponents([]);
       setStep(1);
     }
@@ -192,11 +196,11 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
 
   // Validate step 1 (bar type + basic info)
   const validateStep1 = (): string | null => {
-    if (!selectedBarType) {
-      return 'Selecciona un tipo de barra';
+    if (selectedBarTypes.size === 0) {
+      return 'Seleccioná al menos un tipo de barra';
     }
     if (!hasEnoughIngredients) {
-      return `Las barras "${barTypeLabels[selectedBarType]}" necesitan al menos 2 insumos para recetas. Carga stock como "Para recetas" desde la tab Barras.`;
+      return `Las barras de tipo "${barTypeLabels[primaryBarType as BarType]}" necesitan al menos 2 insumos para recetas. Cargá stock como "Para recetas" desde la tab Barras.`;
     }
     if (!cocktailName.trim()) {
       return 'El nombre del trago es requerido';
@@ -237,15 +241,20 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
     if (price <= 0) {
       return 'El precio de venta debe ser mayor a 0';
     }
-    // Duplicate name + bar type check
-    if (!editingRecipe && selectedBarType) {
-      const existing = recipes.find(
-        (r) =>
-          r.cocktailName.toLowerCase() === cocktailName.trim().toLowerCase() &&
-          r.barTypes.includes(selectedBarType),
+    // Duplicate name + bar type check (exclude direct-sale "recipes" — single component at 100%)
+    if (!editingRecipe && selectedBarTypes.size > 0) {
+      const realRecipes = recipes.filter(
+        (r) => !(r.components.length === 1 && r.components[0].percentage === 100),
       );
-      if (existing) {
-        return `Ya existe una receta "${cocktailName}" para barras ${barTypeLabels[selectedBarType]}`;
+      for (const bt of selectedBarTypes) {
+        const existing = realRecipes.find(
+          (r) =>
+            r.cocktailName.toLowerCase() === cocktailName.trim().toLowerCase() &&
+            r.barTypes.includes(bt),
+        );
+        if (existing) {
+          return `Ya existe una receta "${cocktailName}" para barras ${barTypeLabels[bt]}`;
+        }
       }
     }
     return null;
@@ -268,7 +277,7 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
     if (error) { toast.error(error); return; }
 
     const price = parseFloat(salePrice || '0');
-    const barTypes: BarType[] = selectedBarType ? [selectedBarType] : [];
+    const barTypes: BarType[] = Array.from(selectedBarTypes);
 
     if (editingRecipe && isEditingDirectSale) {
       // Direct-sale products: only update the price (skip components/composition)
@@ -464,15 +473,18 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
       )}
 
       {/* Ingredient availability warnings */}
-      {!isLoading && barTypeIngredientWarnings.length > 0 && (
+      {!isLoading && showWarnings && barTypeIngredientWarnings.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 p-3 space-y-1.5">
           <div className="flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-            <div className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
-              <p className="font-medium">Faltan insumos para algunas recetas</p>
+            <div className="text-xs text-amber-700 dark:text-amber-300 space-y-1.5">
+              <p className="font-semibold">Insumos faltantes para recetas</p>
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
+                Algunas barras no tienen cargados los ingredientes necesarios para preparar estas recetas.
+              </p>
               {barTypeIngredientWarnings.map((w, i) => (
                 <p key={i}>
-                  <strong>{w.recipeName}</strong> en barras <strong>{barTypeLabels[w.barType]}</strong>: falta{w.missingDrinks.length > 1 ? 'n' : ''}{' '}
+                  <strong>{w.recipeName}</strong> en barras <strong>{barTypeLabels[w.barType]}</strong> — necesita{w.missingDrinks.length > 1 ? 'n' : ''}:{' '}
                   {w.missingDrinks.join(', ')}
                 </p>
               ))}
@@ -754,17 +766,45 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
                     </div>
                   </div>
                 ) : (
+                  <>
+                  {eventBarTypes.length > 1 && (
+                    <button
+                      type="button"
+                      className="text-xs text-primary hover:underline font-medium text-left"
+                      onClick={() => {
+                        const allSelected = eventBarTypes.every((bt) => selectedBarTypes.has(bt));
+                        if (allSelected) {
+                          setSelectedBarTypes(new Set());
+                        } else {
+                          setSelectedBarTypes(new Set(eventBarTypes));
+                        }
+                        setComponents([]);
+                      }}
+                    >
+                      {eventBarTypes.every((bt) => selectedBarTypes.has(bt))
+                        ? 'Deseleccionar todas'
+                        : 'Seleccionar todas'}
+                    </button>
+                  )}
                   <div className="grid grid-cols-2 gap-2">
                     {eventBarTypes.map((bt) => {
                       const barsOfType = bars.filter((b) => b.type === bt);
-                      const isSelected = selectedBarType === bt;
+                      const isSelected = selectedBarTypes.has(bt);
                       return (
                         <button
                           key={bt}
                           type="button"
                           onClick={() => {
-                            setSelectedBarType(bt);
-                            // Reset components when bar type changes
+                            setSelectedBarTypes((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(bt)) {
+                                next.delete(bt);
+                              } else {
+                                next.add(bt);
+                              }
+                              return next;
+                            });
+                            // Reset components when bar type selection changes
                             setComponents([]);
                           }}
                           className={cn(
@@ -793,16 +833,17 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
                       );
                     })}
                   </div>
+                  </>
                 )}
-                {selectedBarType && (
+                {selectedBarTypes.size > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    La receta se asignara a todas las barras de tipo "{barTypeLabels[selectedBarType]}"
+                    La receta se asignará a todas las barras de tipo{selectedBarTypes.size > 1 ? 's' : ''}: {Array.from(selectedBarTypes).map((bt) => `"${barTypeLabels[bt]}"`).join(', ')}
                   </p>
                 )}
               </div>
 
               {/* Ingredient availability warning */}
-              {selectedBarType && !isLoadingDrinks && !hasEnoughIngredients && (
+              {primaryBarType && !isLoadingDrinks && !hasEnoughIngredients && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 p-3">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
@@ -811,8 +852,8 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
                         Se necesitan al menos 2 insumos para recetas
                       </p>
                       <p>
-                        Las barras de tipo "{barTypeLabels[selectedBarType]}" tienen {barTypeDrinks.length} insumo{barTypeDrinks.length !== 1 ? 's' : ''} para recetas.
-                        Carga mas stock como "Para recetas" desde la tab "Barras" usando "Cargar Stock a Barras".
+                        Las barras de tipo "{barTypeLabels[primaryBarType as BarType]}" tienen {barTypeDrinks.length} insumo{barTypeDrinks.length !== 1 ? 's' : ''} para recetas.
+                        Cargá más stock como "Para recetas" desde la tab "Barras" usando "Cargar Stock a Barras".
                       </p>
                       {onNavigateToBarras && (
                         <Button
@@ -833,7 +874,7 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
                 </div>
               )}
 
-              {selectedBarType && !isLoadingDrinks && hasEnoughIngredients && (
+              {primaryBarType && !isLoadingDrinks && hasEnoughIngredients && (
                 <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-900 p-2 px-3">
                   <p className="text-xs text-green-700 dark:text-green-300 flex items-center gap-1.5">
                     <Check className="h-3.5 w-3.5" />
@@ -961,7 +1002,7 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
               <div className="rounded-lg border bg-muted/30 p-3">
                 <p className="text-sm font-medium">{cocktailName}</p>
                 <p className="text-xs text-muted-foreground">
-                  {glassVolume}ml{hasIce ? ' · Con hielo' : ''} · Barras {selectedBarType ? barTypeLabels[selectedBarType] : ''}
+                  {glassVolume}ml{hasIce ? ' · Con hielo' : ''} · {selectedBarTypes.size > 0 ? Array.from(selectedBarTypes).map((bt) => barTypeLabels[bt]).join(', ') : ''}
                 </p>
               </div>
 
@@ -1130,17 +1171,31 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
                       Venta directa
                     </Badge>
                   </div>
-                  {selectedBarType && (
-                    <p className="text-xs text-muted-foreground">
-                      Barras: {barTypeLabels[selectedBarType]}
-                    </p>
-                  )}
+                  {(() => {
+                    const barsForProduct = editingRecipe
+                      ? directSaleBarMap.get(editingRecipe.cocktailName.toLowerCase()) || []
+                      : [];
+                    return barsForProduct.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1 mt-1">
+                        <span className="text-xs text-muted-foreground">Disponible en:</span>
+                        {barsForProduct.map((b) => (
+                          <Badge key={b.barId} variant="outline" className="text-[10px] py-0">
+                            {b.barName}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : selectedBarTypes.size > 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Barras de tipo: {Array.from(selectedBarTypes).map((bt) => barTypeLabels[bt]).join(', ')}
+                      </p>
+                    ) : null;
+                  })()}
                 </div>
               ) : (
                 <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
                   <p className="text-sm font-medium">{cocktailName}</p>
                   <p className="text-xs text-muted-foreground">
-                    {glassVolume}ml · {components.length} componentes{hasIce ? ' · Con hielo' : ''} · Barras {selectedBarType ? barTypeLabels[selectedBarType] : ''}
+                    {glassVolume}ml · {components.length} componentes{hasIce ? ' · Con hielo' : ''} · {selectedBarTypes.size > 0 ? Array.from(selectedBarTypes).map((bt) => barTypeLabels[bt]).join(', ') : ''}
                   </p>
                   <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
                     {components.map((c, i) => {
@@ -1228,11 +1283,11 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
                 })()
               )}
 
-              {selectedBarType && (
+              {selectedBarTypes.size > 0 && (
                 <div className="flex items-start gap-3 rounded-lg border bg-muted/50 p-3">
                   <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground">
-                    Esta receta se asignara a todas las barras de tipo <strong>{barTypeLabels[selectedBarType]}</strong> en este evento.
+                    Esta receta se asignará a todas las barras de tipo{selectedBarTypes.size > 1 ? 's' : ''}: <strong>{Array.from(selectedBarTypes).map((bt) => barTypeLabels[bt]).join(', ')}</strong> en este evento.
                   </p>
                 </div>
               )}
@@ -1245,7 +1300,7 @@ export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: Eve
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="button" onClick={handleNext} disabled={!selectedBarType || !hasEnoughIngredients}>
+                <Button type="button" onClick={handleNext} disabled={selectedBarTypes.size === 0 || !hasEnoughIngredients}>
                   Siguiente
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>

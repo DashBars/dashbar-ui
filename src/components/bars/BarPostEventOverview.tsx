@@ -30,13 +30,16 @@ import {
   Loader2,
   Info,
   Ban,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useBars } from '@/hooks/useBars';
 import { useQueries } from '@tanstack/react-query';
 import { stockApi, stockMovementsApi } from '@/lib/api/dashbar';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { stockKeys } from '@/hooks/useStock';
-import type { Stock, BulkReturnStockDto, BulkReturnResult, BulkReturnMode } from '@/lib/api/types';
+import type { Stock, BulkReturnStockDto, BulkReturnResult, BulkReturnMode, BulkDiscardStockDto, BulkDiscardResult } from '@/lib/api/types';
 import { toast } from 'sonner';
 
 interface BarPostEventOverviewProps {
@@ -57,6 +60,269 @@ function formatCurrency(amount: number, currency: string = 'ARS') {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+/* ──────────────── Descarte Section Component ──────────────── */
+interface DescarteSectionProps {
+  partialStock: StockWithBar[];
+  eventId: number;
+  bulkDiscardMutation: ReturnType<typeof useMutation<BulkDiscardResult, any, BulkDiscardStockDto>>;
+  discardResult: BulkDiscardResult | null;
+  setDiscardResult: (r: BulkDiscardResult | null) => void;
+  discardConfirmOpen: boolean;
+  setDiscardConfirmOpen: (open: boolean) => void;
+  showBarColumn: boolean;
+}
+
+function DescarteSection({
+  partialStock,
+  eventId,
+  bulkDiscardMutation,
+  discardResult,
+  setDiscardResult,
+  discardConfirmOpen,
+  setDiscardConfirmOpen,
+  showBarColumn,
+}: DescarteSectionProps) {
+  const [expanded, setExpanded] = useState(true);
+
+  const executeDiscard = () => {
+    const dto: BulkDiscardStockDto = {
+      items: partialStock.map((s) => ({
+        eventId,
+        barId: s.barId,
+        drinkId: s.drinkId,
+        supplierId: s.supplierId,
+        sellAsWholeUnit: s.sellAsWholeUnit,
+      })),
+      notes: 'Descarte de remanentes parciales post-evento',
+    };
+    bulkDiscardMutation.mutate(dto);
+  };
+
+  return (
+    <>
+      <Card className="rounded-2xl border-amber-200 dark:border-amber-800">
+        <CardContent className="p-0">
+          {/* Collapsible header */}
+          <button
+            type="button"
+            className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/30 transition-colors rounded-t-2xl"
+            onClick={() => setExpanded(!expanded)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-amber-500/10 p-2">
+                <Trash2 className="h-4 w-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Remanentes parciales (descarte)</p>
+                <p className="text-xs text-muted-foreground">
+                  Stock con menos de una unidad completa - no se puede devolver
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                {partialStock.length}
+              </Badge>
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </div>
+          </button>
+
+          {expanded && (
+            <div className="border-t">
+              <div className="max-h-[30vh] overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background z-10">
+                    <TableRow>
+                      {showBarColumn && <TableHead>Barra</TableHead>}
+                      <TableHead>Insumo</TableHead>
+                      <TableHead>Marca</TableHead>
+                      <TableHead>Proveedor</TableHead>
+                      <TableHead>Remanente</TableHead>
+                      <TableHead>% de unidad</TableHead>
+                      <TableHead>Uso</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {partialStock.map((item) => {
+                      const key = stockKey(item);
+                      const drinkVol = item.drink?.volume || 1;
+                      const pct = Math.round((item.quantity / drinkVol) * 100);
+                      return (
+                        <TableRow key={key} className="bg-amber-50/30 dark:bg-amber-950/10">
+                          {showBarColumn && (
+                            <TableCell className="text-sm font-medium">
+                              {item.barName || 'Barra desconocida'}
+                            </TableCell>
+                          )}
+                          <TableCell className="font-medium">
+                            {item.drink?.name || 'Insumo desconocido'}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {item.drink?.brand || '-'}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {item.supplier?.name || 'Proveedor desconocido'}
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium">{item.quantity} ml</span>
+                            <span className="text-xs text-muted-foreground ml-1">
+                              / {drinkVol} ml
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-700"
+                            >
+                              {pct}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {item.sellAsWholeUnit ? 'Venta directa' : 'Recetas'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Action bar */}
+              <div className="flex items-center justify-between border-t px-5 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Estos remanentes se registrarán como descarte en los movimientos de stock
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950"
+                  onClick={() => {
+                    setDiscardResult(null);
+                    setDiscardConfirmOpen(true);
+                  }}
+                  disabled={bulkDiscardMutation.isPending}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Dar de baja ({partialStock.length})
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Discard confirmation dialog */}
+      <Dialog
+        open={discardConfirmOpen}
+        onOpenChange={(open) => {
+          if (!bulkDiscardMutation.isPending) {
+            setDiscardConfirmOpen(open);
+            if (!open) setDiscardResult(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>
+              {discardResult ? 'Resultado del descarte' : 'Confirmar descarte'}
+            </DialogTitle>
+            <DialogDescription>
+              {discardResult
+                ? 'Resumen del procesamiento de descarte'
+                : `Se darán de baja ${partialStock.length} remanentes parciales.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {discardResult ? (
+            <div className="space-y-3 py-2">
+              <div className="flex items-center gap-2 text-green-600">
+                <CheckCircle2 className="h-5 w-5" />
+                <span className="font-medium">{discardResult.processed} remanentes dados de baja</span>
+              </div>
+              <p className="text-sm text-muted-foreground pl-7">
+                Total descartado: {discardResult.totalMlDiscarded} ml
+              </p>
+              {discardResult.errors.length > 0 && (
+                <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 mt-2">
+                  <div className="flex items-center gap-2 text-destructive mb-1">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="text-sm font-medium">{discardResult.errors.length} errores</span>
+                  </div>
+                  <ul className="text-xs text-destructive space-y-0.5 pl-6">
+                    {discardResult.errors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <DialogFooter className="pt-2">
+                <Button onClick={() => { setDiscardConfirmOpen(false); setDiscardResult(null); }}>
+                  Cerrar
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-3 py-2">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 space-y-2">
+                  {partialStock.map((item) => {
+                    const drinkVol = item.drink?.volume || 1;
+                    const pct = Math.round((item.quantity / drinkVol) * 100);
+                    return (
+                      <div key={stockKey(item)} className="flex items-center justify-between text-sm">
+                        <span>
+                          {item.drink?.name || 'Insumo'}
+                          {item.drink?.brand && <span className="text-muted-foreground ml-1">({item.drink.brand})</span>}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {item.quantity} ml ({pct}%)
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    Esta acción eliminará estos remanentes del sistema y los registrará como descarte
+                    en los movimientos de stock. No se puede deshacer.
+                  </span>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setDiscardConfirmOpen(false)}
+                  disabled={bulkDiscardMutation.isPending}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={executeDiscard}
+                  disabled={bulkDiscardMutation.isPending}
+                >
+                  {bulkDiscardMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    'Dar de baja'
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
 
 export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewProps) {
@@ -95,9 +361,25 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
     return items;
   }, [stockQueries, targetBars]);
 
-  // Split into returnable (quantity > 0) and consumed (quantity === 0)
-  const returnableStock = useMemo(() => allStock.filter((s) => s.quantity > 0), [allStock]);
-  const consumedStock = useMemo(() => allStock.filter((s) => s.quantity <= 0), [allStock]);
+  // Split into returnable (>= 1 full unit), partial remainders (< 1 full unit), and consumed (0)
+  const { returnableStock, partialStock, consumedStock } = useMemo(() => {
+    const returnable: StockWithBar[] = [];
+    const partial: StockWithBar[] = [];
+    const consumed: StockWithBar[] = [];
+    for (const s of allStock) {
+      if (s.quantity <= 0) {
+        consumed.push(s);
+      } else {
+        const drinkVol = s.drink?.volume || 0;
+        if (drinkVol > 0 && s.quantity < drinkVol) {
+          partial.push(s);
+        } else {
+          returnable.push(s);
+        }
+      }
+    }
+    return { returnableStock: returnable, partialStock: partial, consumedStock: consumed };
+  }, [allStock]);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -119,6 +401,25 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Error al procesar devoluciones');
+    },
+  });
+
+  const [discardResult, setDiscardResult] = useState<BulkDiscardResult | null>(null);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+
+  const bulkDiscardMutation = useMutation({
+    mutationFn: (dto: BulkDiscardStockDto) => stockMovementsApi.bulkDiscard(dto),
+    onSuccess: (data) => {
+      setDiscardResult(data);
+      queryClient.invalidateQueries({ queryKey: ['stock'] });
+      if (data.errors.length === 0) {
+        toast.success(`${data.processed} remanentes dados de baja`);
+      } else {
+        toast.warning(`${data.processed} procesados, ${data.errors.length} errores`);
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Error al dar de baja remanentes');
     },
   });
 
@@ -189,6 +490,7 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
       mode: pendingAction,
       items: itemsToProcess.map((s) => {
         // Convert ml -> units (bottles) since backend expects units
+        // Partial remainders are now handled separately, so unitQuantity is always >= 1
         const drinkVolume = s.drink?.volume || 0;
         const unitQuantity = drinkVolume > 0
           ? Math.floor(s.quantity / drinkVolume)
@@ -199,7 +501,7 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
           drinkId: s.drinkId,
           supplierId: s.supplierId,
           sellAsWholeUnit: s.sellAsWholeUnit,
-          quantity: Math.max(unitQuantity, 1), // safety: never send 0
+          quantity: unitQuantity,
         };
       }),
       notes: pendingAction === 'auto'
@@ -245,8 +547,8 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
     );
   }
 
-  // No returnable items left, but consumed items still exist in DB
-  if (returnableStock.length === 0 && consumedStock.length > 0) {
+  // No returnable items left, but consumed/partial items still exist in DB
+  if (returnableStock.length === 0 && (consumedStock.length > 0 || partialStock.length > 0)) {
     return (
       <div className="space-y-4">
         <Card className="rounded-2xl">
@@ -259,31 +561,67 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
           </CardContent>
         </Card>
 
+        {/* Partial remainders that need to be discarded */}
+        {partialStock.length > 0 && (
+          <DescarteSection
+            partialStock={partialStock}
+            eventId={eventId}
+            bulkDiscardMutation={bulkDiscardMutation}
+            discardResult={discardResult}
+            setDiscardResult={setDiscardResult}
+            discardConfirmOpen={discardConfirmOpen}
+            setDiscardConfirmOpen={setDiscardConfirmOpen}
+            showBarColumn={targetBars.length > 1}
+          />
+        )}
+
         {/* Show consumed items as informational */}
-        <Card className="rounded-2xl">
-          <CardContent className="p-4">
-            <p className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-              <Ban className="h-4 w-4" />
-              {consumedStock.length} {consumedStock.length === 1 ? 'item consumido' : 'items consumidos'} durante el evento
-            </p>
-            <div className="space-y-1.5">
-              {consumedStock.map((item) => (
-                <div
-                  key={stockKey(item)}
-                  className="flex items-center justify-between text-sm text-muted-foreground px-2 py-1 rounded bg-muted/30"
-                >
-                  <span>
-                    {item.drink?.name || 'Insumo'}
-                    {item.drink?.brand && <span className="ml-1">({item.drink.brand})</span>}
-                  </span>
-                  <Badge variant="outline" className="text-[10px] bg-muted">
-                    Consumido
-                  </Badge>
+        {consumedStock.length > 0 && (
+          <Card className="rounded-2xl">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="rounded-lg bg-purple-500/10 p-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-purple-600" />
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                <p className="text-sm font-medium">
+                  {consumedStock.length} {consumedStock.length === 1 ? 'insumo utilizado' : 'insumos utilizados'} durante el evento
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                {consumedStock.map((item) => {
+                  const drinkVol = item.drink?.volume || 0;
+                  const units = drinkVol > 0 ? Math.floor(Math.abs(item.quantity) / drinkVol) : 0;
+                  return (
+                    <div
+                      key={stockKey(item)}
+                      className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-muted/40"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{item.drink?.name || 'Insumo'}</span>
+                        {item.drink?.brand && (
+                          <span className="text-xs text-muted-foreground">({item.drink.brand})</span>
+                        )}
+                        {item.supplier?.name && (
+                          <span className="text-xs text-muted-foreground">- {item.supplier.name}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {drinkVol > 0
+                            ? `${units} ${units === 1 ? 'unidad' : 'unidades'} (${drinkVol} ml c/u)`
+                            : '0 unidades'}
+                        </span>
+                        <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800">
+                          {item.sellAsWholeUnit ? 'Venta directa' : 'Recetas'}
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }
@@ -315,9 +653,11 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
               <div>
                 <p className="text-xs text-muted-foreground">Para devolver</p>
                 <p className="text-xl font-semibold">{returnableStock.length}</p>
-                {consumedStock.length > 0 && (
+                {(consumedStock.length > 0 || partialStock.length > 0) && (
                   <p className="text-xs text-muted-foreground">
-                    + {consumedStock.length} consumidos
+                    {partialStock.length > 0 && `${partialStock.length} remanentes`}
+                    {partialStock.length > 0 && consumedStock.length > 0 && ' + '}
+                    {consumedStock.length > 0 && `${consumedStock.length} consumidos`}
                   </p>
                 )}
               </div>
@@ -509,8 +849,8 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <div className="h-px flex-1 bg-border" />
                         <span className="flex items-center gap-1">
-                          <Ban className="h-3 w-3" />
-                          Consumidos durante el evento ({consumedStock.length})
+                          <CheckCircle2 className="h-3 w-3 text-purple-500" />
+                          Utilizados durante el evento ({consumedStock.length})
                         </span>
                         <div className="h-px flex-1 bg-border" />
                       </div>
@@ -518,24 +858,30 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
                   </TableRow>
                 )}
 
-                {/* Consumed items -- greyed out, non-selectable */}
+                {/* Consumed items -- styled as completed, non-selectable */}
                 {consumedStock.map((item) => {
                   const key = stockKey(item);
+                  const drinkVol = item.drink?.volume || 0;
+                  const totalUnits = drinkVol > 0
+                    ? Math.floor(Math.abs(item.quantity) / drinkVol)
+                    : 0;
                   return (
                     <TableRow
                       key={key}
-                      className="opacity-50 hover:bg-transparent cursor-default"
+                      className="bg-muted/20 hover:bg-muted/30 cursor-default"
                     >
                       <TableCell>
-                        <Checkbox disabled checked={false} />
+                        <div className="h-4 w-4 flex items-center justify-center">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-purple-400" />
+                        </div>
                       </TableCell>
                       {showBarColumn && (
-                        <TableCell className="text-sm">
+                        <TableCell className="text-sm text-muted-foreground">
                           {(item as StockWithBar).barName || 'Barra desconocida'}
                         </TableCell>
                       )}
                       <TableCell>
-                        <div>
+                        <div className="text-muted-foreground">
                           {item.drink?.name || 'Insumo desconocido'}
                           {item.drink?.brand && (
                             <span className="text-xs text-muted-foreground ml-1">
@@ -544,15 +890,20 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm">
+                      <TableCell className="text-sm text-muted-foreground">
                         {item.supplier?.name || 'Proveedor desconocido'}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-[10px] bg-muted border-muted-foreground/20">
-                          Consumido
-                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {totalUnits} {totalUnits === 1 ? 'unidad' : 'unidades'}
+                        </span>
+                        {drinkVol > 0 && (
+                          <span className="text-xs text-muted-foreground/60 ml-1">
+                            ({drinkVol} ml c/u)
+                          </span>
+                        )}
                       </TableCell>
-                      <TableCell className="text-sm">
+                      <TableCell className="text-sm text-muted-foreground">
                         {formatCurrency(item.unitCost, item.currency)}
                       </TableCell>
                       <TableCell>
@@ -560,15 +911,15 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
                           variant="outline"
                           className={
                             item.ownershipMode === 'consignment'
-                              ? 'bg-orange-100 text-orange-800 border-orange-200'
-                              : 'bg-green-100 text-green-800 border-green-200'
+                              ? 'bg-orange-50 text-orange-600 border-orange-200'
+                              : 'bg-green-50 text-green-600 border-green-200'
                           }
                         >
                           {item.ownershipMode === 'consignment' ? 'Consignación' : 'Comprado'}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800">
                           {item.sellAsWholeUnit ? 'Venta directa' : 'Recetas'}
                         </Badge>
                       </TableCell>
@@ -580,6 +931,20 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
           </div>
         </CardContent>
       </Card>
+
+      {/* Partial remainders (descarte) section */}
+      {partialStock.length > 0 && (
+        <DescarteSection
+          partialStock={partialStock}
+          eventId={eventId}
+          bulkDiscardMutation={bulkDiscardMutation}
+          discardResult={discardResult}
+          setDiscardResult={setDiscardResult}
+          discardConfirmOpen={discardConfirmOpen}
+          setDiscardConfirmOpen={setDiscardConfirmOpen}
+          showBarColumn={showBarColumn}
+        />
+      )}
 
       {/* Confirmation dialog */}
       <Dialog open={confirmOpen} onOpenChange={(open) => {

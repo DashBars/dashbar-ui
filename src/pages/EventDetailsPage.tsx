@@ -368,7 +368,7 @@ export function EventDetailsPage() {
             onLoadStock={() => setStockWizardOpen(true)}
             isEditable={status === 'upcoming'}
             hasBars={(bars || []).length > 0}
-            recipeWarnings={eventRecipeWarnings}
+            recipeWarnings={(status === 'upcoming' || status === 'active') ? eventRecipeWarnings : []}
           />
           <BarsSummaryCards bars={bars || []} isLoading={isLoadingBars} />
           <BarsFilters
@@ -383,7 +383,7 @@ export function EventDetailsPage() {
             bars={filteredBars}
             isLoading={isLoadingBars}
             onViewDetails={handleBarClick}
-            recipeWarnings={eventRecipeWarnings}
+            recipeWarnings={(status === 'upcoming' || status === 'active') ? eventRecipeWarnings : []}
           />
         </TabsContent>
 
@@ -391,6 +391,7 @@ export function EventDetailsPage() {
           <EventRecipesTab
             eventId={eventIdNum}
             isEditable={status === 'upcoming'}
+            showWarnings={status === 'upcoming' || status === 'active'}
             onNavigateToBarras={() => setActiveTab('bars')}
           />
         </TabsContent>

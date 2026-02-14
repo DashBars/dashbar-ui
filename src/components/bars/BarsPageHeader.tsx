@@ -89,17 +89,20 @@ export function BarsPageHeader({
             <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
             <div className="flex-1 space-y-1.5">
               <p className="text-xs font-semibold text-amber-800">
-                Recetas sin insumos completos — no se puede activar el evento
+                Insumos faltantes para recetas — no se puede activar el evento
               </p>
-              <ul className="text-xs text-amber-700 space-y-1">
+              <p className="text-[11px] text-amber-600 mt-0.5 leading-relaxed">
+                Las siguientes barras tienen recetas asignadas pero les faltan ingredientes para prepararlas.
+              </p>
+              <ul className="text-xs text-amber-700 space-y-1 mt-1">
                 {recipeWarnings.map((w) => (
                   <li key={`${w.recipeName}-${w.barId}`} className="flex items-start justify-between gap-2">
                     <span>
-                      <span className="font-medium">{w.recipeName}</span>
+                      <span className="font-semibold">{w.recipeName}</span>
                       {' en '}
-                      <span className="font-medium">{w.barName}</span>
+                      <span className="font-semibold">{w.barName}</span>
                       <span className="text-amber-600"> ({w.barType})</span>
-                      {': faltan '}
+                      {' — necesita: '}
                       {w.missingDrinks.join(', ')}
                     </span>
                     <button

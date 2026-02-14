@@ -17,9 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useCreateDrink, useUpdateDrink, useDrinks } from '@/hooks/useDrinks';
-import type { Drink, CreateDrinkDto, UpdateDrinkDto } from '@/lib/api/types';
-import { Loader2, Plus, AlertCircle, Package, Lock } from 'lucide-react';
+import { useCreateGlobalInventory } from '@/hooks/useGlobalInventory';
+import { useSuppliers } from '@/hooks/useSuppliers';
+import type { Drink, CreateDrinkDto, UpdateDrinkDto, OwnershipMode } from '@/lib/api/types';
+import { Loader2, Plus, AlertCircle, Package, Lock, PackagePlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface DrinkFormDialogProps {
@@ -40,6 +43,8 @@ export function DrinkFormDialog({
   );
 
   const { data: allDrinks = [] } = useDrinks();
+  const { mutate: createInventory, isPending: isCreatingInventory } = useCreateGlobalInventory();
+  const { data: suppliers = [] } = useSuppliers();
 
   // Check if this drink has associations that lock critical fields
   const hasAssociations = useMemo(() => {
@@ -68,6 +73,24 @@ export function DrinkFormDialog({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+
+  // Inventory toggle state (create mode only)
+  const [addToInventory, setAddToInventory] = useState(false);
+  const [invSupplierId, setInvSupplierId] = useState<string>('none');
+  const [invSupplierSearch, setInvSupplierSearch] = useState('');
+  const [showInvSupplierSuggestions, setShowInvSupplierSuggestions] = useState(false);
+  const invSupplierInputRef = useRef<HTMLInputElement>(null);
+  const invSupplierSuggestionsRef = useRef<HTMLDivElement>(null);
+  const [invQuantity, setInvQuantity] = useState<string>('');
+  const [invUnitCost, setInvUnitCost] = useState<string>('');
+  const [invCurrency, setInvCurrency] = useState<string>('ARS');
+  const [invOwnershipMode, setInvOwnershipMode] = useState<OwnershipMode>('purchased');
+
+  const filteredInvSuppliers = useMemo(() => {
+    if (!invSupplierSearch.trim()) return suppliers;
+    const q = invSupplierSearch.toLowerCase();
+    return suppliers.filter((s) => s.name.toLowerCase().includes(q));
+  }, [invSupplierSearch, suppliers]);
 
   const suggestions = useMemo(() => {
     if (!name.trim() || isEdit) return [];
@@ -116,8 +139,17 @@ export function DrinkFormDialog({
         setSku('');
         setDrinkType('non_alcoholic');
         setVolume('');
+        // Reset inventory fields
+        setAddToInventory(false);
+        setInvSupplierId('none');
+        setInvSupplierSearch('');
+        setInvQuantity('');
+        setInvUnitCost('');
+        setInvCurrency('ARS');
+        setInvOwnershipMode('purchased');
       }
       setShowSuggestions(false);
+      setShowInvSupplierSuggestions(false);
     }
   }, [open, drink, isEdit]);
 
@@ -131,6 +163,14 @@ export function DrinkFormDialog({
         !nameInputRef.current.contains(e.target as Node)
       ) {
         setShowSuggestions(false);
+      }
+      if (
+        invSupplierSuggestionsRef.current &&
+        !invSupplierSuggestionsRef.current.contains(e.target as Node) &&
+        invSupplierInputRef.current &&
+        !invSupplierInputRef.current.contains(e.target as Node)
+      ) {
+        setShowInvSupplierSuggestions(false);
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -168,16 +208,31 @@ export function DrinkFormDialog({
         brand,
         sku,
         drinkType,
-        // providerType se establece automáticamente como 'in_' en el backend
         volume: parseInt(volume, 10),
       };
       createDrink(dto, {
-        onSuccess: () => onOpenChange(false),
+        onSuccess: (newDrink) => {
+          if (addToInventory && invQuantity && invUnitCost) {
+            createInventory(
+              {
+                drinkId: newDrink.id,
+                supplierId: invSupplierId !== 'none' ? parseInt(invSupplierId, 10) : undefined,
+                totalQuantity: parseInt(invQuantity, 10),
+                unitCost: Math.round(parseFloat(invUnitCost) * 100),
+                currency: invCurrency,
+                ownershipMode: invOwnershipMode,
+              },
+              { onSuccess: () => onOpenChange(false) },
+            );
+          } else {
+            onOpenChange(false);
+          }
+        },
       });
     }
   };
 
-  const isSubmitting = isCreating || isUpdating;
+  const isSubmitting = isCreating || isUpdating || isCreatingInventory;
 
   // Detect if anything changed from the original drink (for edit mode)
   const hasChanges = useMemo(() => {
@@ -190,6 +245,12 @@ export function DrinkFormDialog({
       volume !== drink.volume.toString()
     );
   }, [isEdit, drink, name, brand, sku, drinkType, volume]);
+
+  // Inventory fields valid when toggle is on
+  const inventoryFieldsValid = !addToInventory || (
+    !!invQuantity && parseInt(invQuantity, 10) > 0 &&
+    !!invUnitCost && parseFloat(invUnitCost) >= 0
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -363,6 +424,158 @@ export function DrinkFormDialog({
                   : 'Ejemplo: 1250 = 1.25 litros'}
               </p>
             </div>
+
+            {/* Add to inventory toggle - create mode only */}
+            {!isEdit && (
+              <div className="rounded-xl border p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <PackagePlus className="h-4 w-4 text-muted-foreground" />
+                    <Label htmlFor="addToInventory" className="text-sm font-medium cursor-pointer">
+                      Cargar al inventario global
+                    </Label>
+                  </div>
+                  <Switch
+                    id="addToInventory"
+                    checked={addToInventory}
+                    onCheckedChange={setAddToInventory}
+                    disabled={isSubmitting}
+                  />
+                </div>
+                {addToInventory && (
+                  <div className="space-y-3 pt-1">
+                    <p className="text-xs text-muted-foreground">
+                      Registrá la compra de este insumo directamente.
+                    </p>
+
+                    {/* Supplier autocomplete */}
+                    <div className="space-y-1.5 relative">
+                      <Label htmlFor="invSupplierSearch" className="text-xs">Proveedor</Label>
+                      <Input
+                        ref={invSupplierInputRef}
+                        id="invSupplierSearch"
+                        value={invSupplierSearch}
+                        onChange={(e) => {
+                          setInvSupplierSearch(e.target.value);
+                          setInvSupplierId('none');
+                          setShowInvSupplierSuggestions(true);
+                        }}
+                        onFocus={() => setShowInvSupplierSuggestions(true)}
+                        placeholder="Buscar proveedor..."
+                        autoComplete="off"
+                        disabled={isSubmitting}
+                        className="h-8 text-sm"
+                      />
+                      {showInvSupplierSuggestions && (
+                        <div
+                          ref={invSupplierSuggestionsRef}
+                          className="absolute z-50 top-full left-0 right-0 mt-1 rounded-md border bg-popover shadow-md max-h-36 overflow-y-auto"
+                        >
+                          <button
+                            type="button"
+                            className="w-full text-left px-3 py-1.5 hover:bg-accent transition-colors text-xs text-muted-foreground"
+                            onClick={() => {
+                              setInvSupplierId('none');
+                              setInvSupplierSearch('');
+                              setShowInvSupplierSuggestions(false);
+                            }}
+                          >
+                            Sin proveedor
+                          </button>
+                          {filteredInvSuppliers.map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              className={`w-full text-left px-3 py-1.5 hover:bg-accent transition-colors text-xs ${invSupplierId === s.id.toString() ? 'bg-accent' : ''}`}
+                              onClick={() => {
+                                setInvSupplierId(s.id.toString());
+                                setInvSupplierSearch(s.name);
+                                setShowInvSupplierSuggestions(false);
+                              }}
+                            >
+                              {s.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-[10px] text-muted-foreground">Opcional</p>
+                    </div>
+
+                    {/* Ownership mode */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="invOwnershipMode" className="text-xs">Tipo de propiedad</Label>
+                      <Select
+                        value={invOwnershipMode}
+                        onValueChange={(v) => setInvOwnershipMode(v as OwnershipMode)}
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger id="invOwnershipMode" className="h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="purchased">Comprado</SelectItem>
+                          <SelectItem value="consignment">Consignacion</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Quantity */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="invQuantity" className="text-xs">
+                        Cantidad <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="invQuantity"
+                        type="number"
+                        min="1"
+                        value={invQuantity}
+                        onChange={(e) => setInvQuantity(e.target.value)}
+                        disabled={isSubmitting}
+                        placeholder="20"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+
+                    {/* Unit cost + currency */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="invUnitCost" className="text-xs">
+                          Costo unitario <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="invUnitCost"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={invUnitCost}
+                          onChange={(e) => setInvUnitCost(e.target.value)}
+                          disabled={isSubmitting}
+                          placeholder="50.00"
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="invCurrency" className="text-xs">Moneda</Label>
+                        <Select
+                          value={invCurrency}
+                          onValueChange={setInvCurrency}
+                          disabled={isSubmitting}
+                        >
+                          <SelectTrigger id="invCurrency" className="h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ARS">ARS</SelectItem>
+                            <SelectItem value="USD">USD</SelectItem>
+                            <SelectItem value="EUR">EUR</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           {isDuplicate && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/5 px-3 py-2.5 mb-4">
@@ -382,14 +595,14 @@ export function DrinkFormDialog({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isSubmitting || isDuplicate || !hasChanges}>
+            <Button type="submit" disabled={isSubmitting || isDuplicate || !hasChanges || !inventoryFieldsValid}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isEdit ? 'Actualizando...' : 'Creando...'}
+                  {isCreatingInventory ? 'Cargando stock...' : isEdit ? 'Actualizando...' : 'Creando...'}
                 </>
               ) : (
-                isEdit ? 'Actualizar' : 'Crear'
+                isEdit ? 'Actualizar' : addToInventory ? 'Crear y cargar stock' : 'Crear'
               )}
             </Button>
           </DialogFooter>

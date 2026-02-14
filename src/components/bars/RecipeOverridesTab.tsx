@@ -1,11 +1,12 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEventRecipes } from '@/hooks/useRecipes';
-import { GlassWater, Snowflake, Beaker, ExternalLink, Info } from 'lucide-react';
+import { GlassWater, Snowflake, Beaker, ExternalLink, Info, Package, Filter, Search } from 'lucide-react';
 import type { BarType, EventRecipe } from '@/lib/api/types';
 
 interface RecipeOverridesTabProps {
@@ -30,19 +31,37 @@ function formatPrice(cents: number): string {
 
 function RecipeCard({ recipe }: { recipe: EventRecipe }) {
   const totalPercentage = recipe.components.reduce((sum, c) => sum + c.percentage, 0);
+  const isDirectSale = recipe.components.length === 1 && recipe.components[0].percentage === 100;
 
   return (
     <Card className="rounded-xl">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base">{recipe.cocktailName}</CardTitle>
+          <div className="flex items-center gap-2 min-w-0">
+            {isDirectSale ? (
+              <Package className="h-4 w-4 text-green-600 shrink-0" />
+            ) : (
+              <Beaker className="h-4 w-4 text-blue-600 shrink-0" />
+            )}
+            <CardTitle className="text-base truncate">{recipe.cocktailName}</CardTitle>
+          </div>
           {recipe.salePrice > 0 && (
-            <Badge variant="default" className="gap-1">
+            <Badge variant="default" className="gap-1 shrink-0">
               {formatPrice(recipe.salePrice)}
             </Badge>
           )}
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+          <Badge
+            variant="secondary"
+            className={
+              isDirectSale
+                ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-950 text-[10px] py-0'
+                : 'text-blue-700 bg-blue-100 dark:text-blue-300 dark:bg-blue-950 text-[10px] py-0'
+            }
+          >
+            {isDirectSale ? 'Venta directa' : 'Coctel'}
+          </Badge>
           <span className="flex items-center gap-1">
             <GlassWater className="h-3.5 w-3.5" />
             {recipe.glassVolume}ml
@@ -116,6 +135,39 @@ export function RecipeOverridesTab({
     return allRecipes.filter((r) => r.barTypes.includes(barType));
   }, [allRecipes, barType]);
 
+  // Filter state
+  const [cardFilter, setCardFilter] = useState<'all' | 'direct' | 'cocktail'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const cocktailCount = useMemo(
+    () => recipes.filter((r) => !(r.components.length === 1 && r.components[0].percentage === 100)).length,
+    [recipes],
+  );
+  const directSaleCount = useMemo(
+    () => recipes.filter((r) => r.components.length === 1 && r.components[0].percentage === 100).length,
+    [recipes],
+  );
+
+  const filteredRecipes = useMemo(() => {
+    let result = recipes;
+    // Type filter
+    if (cardFilter === 'direct') {
+      result = result.filter((r) => r.components.length === 1 && r.components[0].percentage === 100);
+    } else if (cardFilter === 'cocktail') {
+      result = result.filter((r) => !(r.components.length === 1 && r.components[0].percentage === 100));
+    }
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (r) =>
+          r.cocktailName.toLowerCase().includes(q) ||
+          r.components.some((c) => c.drink?.name.toLowerCase().includes(q)),
+      );
+    }
+    return result;
+  }, [recipes, cardFilter, searchQuery]);
+
   const goToEventRecipes = () => {
     navigate(`/events/${eventId}`, { state: { tab: 'recipes' } });
   };
@@ -185,15 +237,65 @@ export function RecipeOverridesTab({
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
             <p className="text-xs text-muted-foreground">
               {recipes.length} receta{recipes.length !== 1 ? 's' : ''} asignada{recipes.length !== 1 ? 's' : ''} a barras <strong>{barType ? barTypeLabels[barType] : ''}</strong>.
-              Para crear, editar o eliminar recetas usa el boton "Gestionar recetas del evento".
+              Para crear, editar o eliminar recetas usá el botón "Gestionar recetas del evento".
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {recipes.map((recipe) => (
-              <RecipeCard key={recipe.id} recipe={recipe} />
-            ))}
+          {/* Filters row */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative max-w-xs flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre o insumo..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-8 text-sm"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Button
+                variant={cardFilter === 'all' ? 'default' : 'outline'}
+                size="sm"
+                className="h-7 text-xs px-3"
+                onClick={() => setCardFilter('all')}
+              >
+                Todos ({recipes.length})
+              </Button>
+              <Button
+                variant={cardFilter === 'cocktail' ? 'default' : 'outline'}
+                size="sm"
+                className="h-7 text-xs px-3 gap-1"
+                onClick={() => setCardFilter('cocktail')}
+              >
+                <Beaker className="h-3 w-3" />
+                Cocteles ({cocktailCount})
+              </Button>
+              <Button
+                variant={cardFilter === 'direct' ? 'default' : 'outline'}
+                size="sm"
+                className="h-7 text-xs px-3 gap-1"
+                onClick={() => setCardFilter('direct')}
+              >
+                <Package className="h-3 w-3" />
+                Venta directa ({directSaleCount})
+              </Button>
+            </div>
           </div>
+
+          {filteredRecipes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                No se encontraron recetas con los filtros aplicados.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredRecipes.map((recipe) => (
+                <RecipeCard key={recipe.id} recipe={recipe} />
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>

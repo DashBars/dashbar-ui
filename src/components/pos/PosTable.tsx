@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -7,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead, useTableSort, sortItems } from '@/components/ui/sortable-table-head';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -78,8 +79,24 @@ function formatRelativeTime(dateString?: string) {
   return date.toLocaleDateString();
 }
 
+const posnetSortGetters: Record<string, (item: Posnet) => string | number | null | undefined> = {
+  name: (item) => item.name?.toLowerCase(),
+  code: (item) => item.code?.toLowerCase(),
+  bar: (item) => item.bar?.name?.toLowerCase(),
+  status: (item) => item.status?.toLowerCase(),
+  traffic: (item) => item.traffic,
+  lastHeartbeatAt: (item) =>
+    item.lastHeartbeatAt ? new Date(item.lastHeartbeatAt).getTime() : null,
+};
+
 export function PosTable({ posnets, eventId, onEdit }: PosTableProps) {
   const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  const { sortKey, sortDir, handleSort } = useTableSort();
+  const sortedItems = useMemo(
+    () => sortItems(posnets, sortKey, sortDir, posnetSortGetters),
+    [posnets, sortKey, sortDir],
+  );
 
   const deletePosnet = useDeletePosnet(eventId);
 
@@ -123,17 +140,59 @@ export function PosTable({ posnets, eventId, onEdit }: PosTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Nombre</TableHead>
-            <TableHead>Código</TableHead>
-            <TableHead>Barra</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead>Tráfico</TableHead>
-            <TableHead>Última Señal</TableHead>
+            <SortableTableHead
+              sortKey="name"
+              currentSort={sortKey}
+              currentDirection={sortDir}
+              onSort={handleSort}
+            >
+              Nombre
+            </SortableTableHead>
+            <SortableTableHead
+              sortKey="code"
+              currentSort={sortKey}
+              currentDirection={sortDir}
+              onSort={handleSort}
+            >
+              Código
+            </SortableTableHead>
+            <SortableTableHead
+              sortKey="bar"
+              currentSort={sortKey}
+              currentDirection={sortDir}
+              onSort={handleSort}
+            >
+              Barra
+            </SortableTableHead>
+            <SortableTableHead
+              sortKey="status"
+              currentSort={sortKey}
+              currentDirection={sortDir}
+              onSort={handleSort}
+            >
+              Estado
+            </SortableTableHead>
+            <SortableTableHead
+              sortKey="traffic"
+              currentSort={sortKey}
+              currentDirection={sortDir}
+              onSort={handleSort}
+            >
+              Tráfico
+            </SortableTableHead>
+            <SortableTableHead
+              sortKey="lastHeartbeatAt"
+              currentSort={sortKey}
+              currentDirection={sortDir}
+              onSort={handleSort}
+            >
+              Última Señal
+            </SortableTableHead>
             <TableHead className="w-[80px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {posnets.map((posnet) => (
+          {sortedItems.map((posnet) => (
             <TableRow key={posnet.id}>
               <TableCell className="font-medium">{posnet.name}</TableCell>
               <TableCell>

@@ -259,7 +259,7 @@ export function SuppliersAndInventoryPage() {
             {globalInventory.length > 0 && (
               <Button onClick={handleAddStock}>
                 <Plus className="mr-2 h-4 w-4" />
-                Agregar Stock
+                Agregar o reabastecer stock
               </Button>
             )}
           </div>

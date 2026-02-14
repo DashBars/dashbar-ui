@@ -674,6 +674,26 @@ export interface BulkReturnResult {
   errors: string[];
 }
 
+export interface DiscardStockDto {
+  eventId: number;
+  barId: number;
+  drinkId: number;
+  supplierId: number;
+  sellAsWholeUnit: boolean;
+  notes?: string;
+}
+
+export interface BulkDiscardStockDto {
+  items: DiscardStockDto[];
+  notes?: string;
+}
+
+export interface BulkDiscardResult {
+  processed: number;
+  totalMlDiscarded: number;
+  errors: string[];
+}
+
 export interface CreateManagerInventoryDto {
   drinkId: number;
   supplierId: number;

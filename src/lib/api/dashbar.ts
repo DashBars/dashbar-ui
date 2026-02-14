@@ -44,6 +44,8 @@ import type {
   ReturnStockDto,
   BulkReturnStockDto,
   BulkReturnResult,
+  BulkDiscardStockDto,
+  BulkDiscardResult,
   EventRecipe,
   CreateRecipeDto,
   UpdateRecipeDto,
@@ -718,6 +720,10 @@ export const stockMovementsApi = {
     const response = await api.post('/stock/bulk-return', dto);
     return response.data;
   },
+  bulkDiscard: async (dto: BulkDiscardStockDto): Promise<BulkDiscardResult> => {
+    const response = await api.post('/stock/bulk-discard', dto);
+    return response.data;
+  },
 };
 
 // Venues API
@@ -978,40 +984,6 @@ export const reportsApi = {
     } catch {
       return false;
     }
-  },
-
-  // Generate CSV export
-  generateCSV: async (eventId: number): Promise<{ path: string }> => {
-    const response = await api.post<{ path: string }>(`/events/${eventId}/report/csv`);
-    return response.data;
-  },
-
-  // Download CSV export
-  downloadCSV: async (eventId: number): Promise<Blob> => {
-    const response = await api.get(`/events/${eventId}/report/csv`, {
-      responseType: 'blob',
-    });
-    return response.data;
-  },
-
-  // Generate PDF export
-  generatePDF: async (eventId: number): Promise<{ path: string }> => {
-    const response = await api.post<{ path: string }>(`/events/${eventId}/report/pdf`);
-    return response.data;
-  },
-
-  // Download PDF export
-  downloadPDF: async (eventId: number): Promise<Blob> => {
-    const response = await api.get(`/events/${eventId}/report/pdf`, {
-      responseType: 'blob',
-    });
-    return response.data;
-  },
-
-  // Send report via email
-  sendReportEmail: async (eventId: number, recipients: string[]): Promise<{ message: string }> => {
-    const response = await api.post(`/events/${eventId}/report/send-email`, { recipients });
-    return response.data;
   },
 
   // Get events eligible for comparison

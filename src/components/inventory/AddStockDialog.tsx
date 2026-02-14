@@ -20,6 +20,7 @@ import {
 import {
   useCreateGlobalInventory,
   useUpdateGlobalInventory,
+  useGlobalInventory,
 } from '@/hooks/useGlobalInventory';
 import { useDrinks } from '@/hooks/useDrinks';
 import { useSuppliers } from '@/hooks/useSuppliers';
@@ -29,7 +30,7 @@ import type {
   UpdateGlobalInventoryDto,
   OwnershipMode,
 } from '@/lib/api/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, PackagePlus, Info } from 'lucide-react';
 
 interface AddStockDialogProps {
   inventory?: GlobalInventory | null;
@@ -47,6 +48,7 @@ export function AddStockDialog({
     useCreateGlobalInventory();
   const { mutate: updateInventory, isPending: isUpdating } =
     useUpdateGlobalInventory(inventory?.id || 0);
+  const { data: allInventory = [] } = useGlobalInventory();
 
   const { data: drinks = [], isLoading: isLoadingDrinks } = useDrinks();
   const { data: suppliers = [], isLoading: isLoadingSuppliers } = useSuppliers();
@@ -82,6 +84,50 @@ export function AddStockDialog({
     const q = supplierSearch.toLowerCase();
     return suppliers.filter((s) => s.name.toLowerCase().includes(q));
   }, [supplierSearch, suppliers]);
+
+  // Detect existing inventory entry for the selected drink+supplier combo
+  const existingEntry = useMemo(() => {
+    if (isEdit || !drinkId) return null;
+    const dId = parseInt(drinkId, 10);
+    if (isNaN(dId)) return null;
+    const sId = supplierId !== 'none' ? parseInt(supplierId, 10) : null;
+    return allInventory.find(
+      (inv) => inv.drinkId === dId && (sId === null ? inv.supplierId === null : inv.supplierId === sId),
+    ) || null;
+  }, [isEdit, drinkId, supplierId, allInventory]);
+
+  // Dynamic update hook for restocking existing entry
+  const { mutate: restockInventory, isPending: isRestocking } =
+    useUpdateGlobalInventory(existingEntry?.id || 0);
+
+  // Auto-fill currency (but NOT cost) when existing entry is detected
+  useEffect(() => {
+    if (existingEntry && !isEdit) {
+      setCurrency(existingEntry.currency || 'ARS');
+    }
+  }, [existingEntry, isEdit]);
+
+  // Weighted average cost calculation for restocking
+  const weightedAvgCost = useMemo(() => {
+    if (!existingEntry || isEdit) return null;
+    const additionalQty = parseInt(totalQuantity, 10);
+    const newCost = parseFloat(unitCost);
+    if (!additionalQty || additionalQty <= 0 || !newCost || newCost <= 0) return null;
+    const existingCostPerUnit = existingEntry.unitCost / 100; // from cents to display
+    const existingQty = existingEntry.totalQuantity;
+    const avg =
+      (existingQty * existingCostPerUnit + additionalQty * newCost) /
+      (existingQty + additionalQty);
+    return avg;
+  }, [existingEntry, isEdit, totalQuantity, unitCost]);
+
+  const costChanged = useMemo(() => {
+    if (!existingEntry || isEdit) return false;
+    const newCost = parseFloat(unitCost);
+    if (!newCost || newCost <= 0) return false;
+    const existingCostPerUnit = existingEntry.unitCost / 100;
+    return Math.abs(newCost - existingCostPerUnit) > 0.001;
+  }, [existingEntry, isEdit, unitCost]);
 
   useEffect(() => {
     if (open) {
@@ -147,12 +193,28 @@ export function AddStockDialog({
       updateInventory(dto, {
         onSuccess: () => onOpenChange(false),
       });
+    } else if (existingEntry) {
+      // Restock: increment totalQuantity and compute weighted average cost
+      const additionalQty = parseInt(totalQuantity, 10);
+      const finalCost = weightedAvgCost != null
+        ? Math.round(weightedAvgCost * 100)
+        : unitCost
+          ? Math.round(parseFloat(unitCost) * 100)
+          : undefined;
+      const dto: UpdateGlobalInventoryDto = {
+        totalQuantity: existingEntry.totalQuantity + additionalQty,
+        unitCost: finalCost,
+        currency: currency || undefined,
+      };
+      restockInventory(dto, {
+        onSuccess: () => onOpenChange(false),
+      });
     } else {
       const dto: CreateGlobalInventoryDto = {
         drinkId: parseInt(drinkId, 10),
         supplierId: supplierId !== 'none' ? parseInt(supplierId, 10) : undefined,
         totalQuantity: parseInt(totalQuantity, 10),
-        unitCost: Math.round(parseFloat(unitCost) * 100), // Convertir a centavos para almacenar
+        unitCost: Math.round(parseFloat(unitCost) * 100),
         currency: currency,
         sku: sku || undefined,
         ownershipMode: ownershipMode,
@@ -163,7 +225,7 @@ export function AddStockDialog({
     }
   };
 
-  const isSubmitting = isCreating || isUpdating;
+  const isSubmitting = isCreating || isUpdating || isRestocking;
   const selectedDrink = drinks.find((d) => d.id.toString() === drinkId);
   const canSubmit = isEdit || (!!drinkId && drinkId !== '' && !isNaN(parseInt(drinkId, 10)));
 
@@ -172,12 +234,14 @@ export function AddStockDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
-            {isEdit ? 'Editar Stock' : 'Agregar Stock'}
+            {isEdit ? 'Editar Stock' : existingEntry ? 'Reabastecer Stock' : 'Agregar Stock'}
           </DialogTitle>
           <DialogDescription>
             {isEdit
               ? 'Actualiza la cantidad o costo del stock.'
-              : 'Registra una compra de insumos. Selecciona un insumo previamente creado y el proveedor del cual lo compraste.'}
+              : existingEntry
+                ? 'Ya tenés este insumo en el inventario. Agregá más unidades al stock existente.'
+                : 'Registra una compra de insumos. Selecciona un insumo previamente creado y el proveedor del cual lo compraste.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -296,7 +360,24 @@ export function AddStockDialog({
                 </div>
               </>
             )}
-            {!isEdit && (
+            {/* Restock banner — shown when existing entry is detected */}
+            {!isEdit && existingEntry && (
+              <div className="flex items-start gap-2.5 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 px-3 py-2.5">
+                <PackagePlus className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
+                  <p className="font-medium">Stock existente encontrado</p>
+                  <p className="text-xs leading-relaxed">
+                    Ya tenés <strong>{existingEntry.totalQuantity} unidades</strong> de este insumo
+                    {existingEntry.supplier ? ` (${existingEntry.supplier.name})` : ''}
+                    {existingEntry.allocatedQuantity > 0 && (
+                      <>, de las cuales <strong>{existingEntry.allocatedQuantity}</strong> ya están asignadas a barras</>
+                    )}.
+                    Las unidades que agregues se sumarán al total existente.
+                  </p>
+                </div>
+              </div>
+            )}
+            {!isEdit && !existingEntry && (
               <div className="space-y-2">
                 <Label htmlFor="ownershipMode">Tipo de Propiedad</Label>
                 <Select
@@ -319,7 +400,7 @@ export function AddStockDialog({
             )}
             <div className="space-y-2">
               <Label htmlFor="totalQuantity">
-                Cantidad <span className="text-destructive">*</span>
+                {existingEntry ? 'Cantidad a agregar' : 'Cantidad'} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="totalQuantity"
@@ -329,16 +410,18 @@ export function AddStockDialog({
                 onChange={(e) => setTotalQuantity(e.target.value)}
                 required
                 disabled={isSubmitting}
-                placeholder="40"
+                placeholder={existingEntry ? 'Ej: 20' : '40'}
               />
               <p className="text-xs text-muted-foreground">
-                Cantidad de unidades compradas
+                {existingEntry
+                  ? `Unidades adicionales a sumar (total quedará en ${existingEntry.totalQuantity + (parseInt(totalQuantity, 10) || 0)})`
+                  : 'Cantidad de unidades compradas'}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="unitCost">
-                  Costo Unitario <span className="text-destructive">*</span>
+                  {existingEntry ? 'Costo unitario nuevo' : 'Costo Unitario'} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="unitCost"
@@ -372,22 +455,52 @@ export function AddStockDialog({
                 </Select>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Ingresa el costo unitario en unidades (ej: 50.00 para $50.00)
-            </p>
-            <div className="space-y-2">
-              <Label htmlFor="sku">SKU del Insumo</Label>
-              <Input
-                id="sku"
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                disabled={isSubmitting}
-                placeholder="SKU-12345"
-              />
+            {existingEntry ? (
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">
+                  Costo unitario del lote anterior: <strong>${(existingEntry.unitCost / 100).toFixed(2)}</strong>. Ingresá el costo de esta nueva compra.
+                </p>
+                {costChanged && weightedAvgCost != null && (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 px-3 py-2">
+                    <Info className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="text-xs text-amber-800 dark:text-amber-300 space-y-0.5">
+                      <p className="font-medium">El costo cambió respecto al lote anterior</p>
+                      <p>
+                        Lote anterior: {existingEntry.totalQuantity} uds × ${(existingEntry.unitCost / 100).toFixed(2)}
+                      </p>
+                      <p>
+                        Nuevo lote: {parseInt(totalQuantity, 10) || 0} uds × ${parseFloat(unitCost || '0').toFixed(2)}
+                      </p>
+                      <p className="font-semibold">
+                        Costo promedio ponderado resultante: ${weightedAvgCost.toFixed(2)}
+                      </p>
+                      <p className="text-[10px] leading-snug opacity-80">
+                        El costo del stock ya asignado a barras no se modifica. Solo se actualiza el costo de referencia del inventario global.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
               <p className="text-xs text-muted-foreground">
-                Opcional. SKU del insumo en tu inventario.
+                Ingresá el costo unitario (ej: 50.00 para $50.00)
               </p>
-            </div>
+            )}
+            {!existingEntry && (
+              <div className="space-y-2">
+                <Label htmlFor="sku">SKU del Insumo</Label>
+                <Input
+                  id="sku"
+                  value={sku}
+                  onChange={(e) => setSku(e.target.value)}
+                  disabled={isSubmitting}
+                  placeholder="SKU-12345"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Opcional. SKU del insumo en tu inventario.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter className="mt-6">
             <Button
@@ -402,10 +515,10 @@ export function AddStockDialog({
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isEdit ? 'Actualizando...' : 'Agregando...'}
+                  {isEdit ? 'Actualizando...' : existingEntry ? 'Reabasteciendo...' : 'Agregando...'}
                 </>
               ) : (
-                isEdit ? 'Actualizar' : 'Agregar Stock'
+                isEdit ? 'Actualizar' : existingEntry ? 'Reabastecer Stock' : 'Agregar Stock'
               )}
             </Button>
           </DialogFooter>

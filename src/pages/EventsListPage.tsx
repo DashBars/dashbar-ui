@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead, useTableSort, sortItems } from '@/components/ui/sortable-table-head';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEvents, useUnarchiveEvent } from '@/hooks/useEvents';
 import { EventFormDialog } from '@/components/events/EventFormDialog';
@@ -72,6 +73,15 @@ export function EventsListPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
+  const { sortKey, sortDir, handleSort } = useTableSort();
+  const sortGetters: Record<string, (item: Event) => string | number | null | undefined> = {
+    name: (e) => e.name?.toLowerCase(),
+    venue: (e) => e.venue?.name?.toLowerCase() ?? '',
+    status: (e) => getEventStatus(e)?.toLowerCase() ?? '',
+    startedAt: (e) => (e.startedAt ? new Date(e.startedAt).getTime() : null),
+    finishedAt: (e) => (e.finishedAt ? new Date(e.finishedAt).getTime() : null),
+  };
+
   const searchedEvents = useMemo(() => {
     if (!search) return events;
     const lowerSearch = search.toLowerCase();
@@ -93,6 +103,16 @@ export function EventsListPage() {
   const archivedEvents = useMemo(() => {
     return searchedEvents.filter((e) => getEventStatus(e) === 'archived');
   }, [searchedEvents]);
+
+  const sortedActiveEvents = useMemo(
+    () => sortItems(activeEvents, sortKey, sortDir, sortGetters),
+    [activeEvents, sortKey, sortDir],
+  );
+
+  const sortedArchivedEvents = useMemo(
+    () => sortItems(archivedEvents, sortKey, sortDir, sortGetters),
+    [archivedEvents, sortKey, sortDir],
+  );
 
   const handleCreate = () => {
     setEditingEvent(null);
@@ -225,15 +245,25 @@ export function EventsListPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Sede</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Inicio</TableHead>
-                      <TableHead>Fin</TableHead>
+                      <SortableTableHead sortKey="name" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                        Nombre
+                      </SortableTableHead>
+                      <SortableTableHead sortKey="venue" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                        Sede
+                      </SortableTableHead>
+                      <SortableTableHead sortKey="status" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                        Estado
+                      </SortableTableHead>
+                      <SortableTableHead sortKey="startedAt" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                        Inicio
+                      </SortableTableHead>
+                      <SortableTableHead sortKey="finishedAt" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                        Fin
+                      </SortableTableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {activeEvents.length === 0 ? (
+                    {sortedActiveEvents.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={5}
@@ -243,7 +273,7 @@ export function EventsListPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      activeEvents.map((event) => {
+                      sortedActiveEvents.map((event) => {
                         const status = getEventStatus(event);
                         return (
                           <TableRow
@@ -294,16 +324,26 @@ export function EventsListPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Sede</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Inicio</TableHead>
-                      <TableHead>Fin</TableHead>
+                      <SortableTableHead sortKey="name" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                        Nombre
+                      </SortableTableHead>
+                      <SortableTableHead sortKey="venue" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                        Sede
+                      </SortableTableHead>
+                      <SortableTableHead sortKey="status" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                        Estado
+                      </SortableTableHead>
+                      <SortableTableHead sortKey="startedAt" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                        Inicio
+                      </SortableTableHead>
+                      <SortableTableHead sortKey="finishedAt" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                        Fin
+                      </SortableTableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {archivedEvents.length === 0 ? (
+                    {sortedArchivedEvents.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={6}
@@ -313,7 +353,7 @@ export function EventsListPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      archivedEvents.map((event) => {
+                      sortedArchivedEvents.map((event) => {
                         const status = getEventStatus(event);
                         return (
                           <TableRow

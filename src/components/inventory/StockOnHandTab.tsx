@@ -7,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead, useTableSort, sortItems } from '@/components/ui/sortable-table-head';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -47,6 +48,8 @@ export function StockOnHandTab({ eventId, barId }: StockOnHandTabProps) {
   const [ownershipFilter, setOwnershipFilter] = useState<OwnershipMode | 'all'>('all');
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
+  const { sortKey, sortDir, handleSort } = useTableSort();
+
   const filteredSummary = useMemo(() => {
     let filtered = summary;
 
@@ -70,6 +73,27 @@ export function StockOnHandTab({ eventId, barId }: StockOnHandTabProps) {
       return true;
     });
   };
+
+  const sortGetters = useMemo(
+    () => ({
+      name: (item: { drinkName?: string }) => item.drinkName?.toLowerCase() ?? '',
+      quantity: (item: { unitCount?: number; totalQuantity?: number }) =>
+        item.unitCount ?? item.totalQuantity ?? 0,
+      suppliers: (item: { supplierCount?: number }) => item.supplierCount ?? 0,
+      valuation: (item: { drinkId: number }) => {
+        const breakdown = getStockBreakdown(item.drinkId);
+        return breakdown.length > 0
+          ? breakdown.reduce((sum, s) => sum + (s.unitCost * s.quantity) / 100, 0)
+          : 0;
+      },
+    }),
+    [supplierFilter, ownershipFilter, stockBySupplier],
+  );
+
+  const sortedSummary = useMemo(
+    () => sortItems(filteredSummary, sortKey, sortDir, sortGetters),
+    [filteredSummary, sortKey, sortDir, sortGetters],
+  );
 
   const toggleRow = (drinkId: number) => {
     const newExpanded = new Set(expandedRows);
@@ -178,21 +202,29 @@ export function StockOnHandTab({ eventId, barId }: StockOnHandTabProps) {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[50px]"></TableHead>
-              <TableHead>Insumo</TableHead>
-              <TableHead>Cantidad Total</TableHead>
-              <TableHead>Proveedores</TableHead>
-              <TableHead>Valuación</TableHead>
+              <SortableTableHead sortKey="name" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                Insumo
+              </SortableTableHead>
+              <SortableTableHead sortKey="quantity" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                Cantidad Total
+              </SortableTableHead>
+              <SortableTableHead sortKey="suppliers" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                Proveedores
+              </SortableTableHead>
+              <SortableTableHead sortKey="valuation" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                Valuación
+              </SortableTableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredSummary.length === 0 ? (
+            {sortedSummary.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
                   No se encontró stock
                 </TableCell>
               </TableRow>
             ) : (
-              filteredSummary.map((item) => {
+              sortedSummary.map((item) => {
                 const breakdown = getStockBreakdown(item.drinkId);
                 const isExpanded = expandedRows.has(item.drinkId);
                 const hasBreakdown = breakdown.length > 0;

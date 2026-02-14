@@ -392,19 +392,39 @@ export function BarManagementPage() {
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
-                      <div className="space-y-1">
+                      <div className="space-y-1.5">
                         <p className="text-sm font-semibold text-amber-800">
-                          Recetas sin insumos suficientes
+                          Insumos faltantes para recetas
                         </p>
-                        <ul className="text-xs text-amber-700 space-y-0.5">
+                        <p className="text-xs text-amber-700">
+                          Esta barra tiene recetas asignadas (por ser tipo <strong className="capitalize">{bar?.type}</strong>) que requieren insumos que aún no están cargados. Cargá el stock faltante antes de activar el evento.
+                        </p>
+                        <ul className="text-xs text-amber-700 space-y-1 pt-1">
                           {recipeWarnings.map((w) => (
-                            <li key={w.recipeName}>
-                              <span className="font-medium">{w.recipeName}</span>
-                              {': faltan '}
-                              {w.missingDrinks.join(', ')}
+                            <li key={w.recipeName} className="flex items-start gap-1.5">
+                              <span className="text-amber-500 mt-0.5">•</span>
+                              <span>
+                                <span className="font-semibold">{w.recipeName}</span>
+                                {' — necesita: '}
+                                {w.missingDrinks.map((d, i) => (
+                                  <span key={d}>
+                                    {i > 0 && ', '}
+                                    <span className="font-medium">{d}</span>
+                                  </span>
+                                ))}
+                              </span>
                             </li>
                           ))}
                         </ul>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-amber-800 border-amber-300 hover:bg-amber-100 mt-1"
+                          onClick={() => setActiveTab('stock')}
+                        >
+                          Ir a cargar stock
+                          <ArrowRight className="ml-1.5 h-3 w-3" />
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -512,6 +532,39 @@ export function BarManagementPage() {
           </TabsContent>
 
           <TabsContent value="stock" className="space-y-4">
+            {recipeWarnings.length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-amber-800">
+                      Insumos faltantes para recetas asignadas a esta barra
+                    </p>
+                    <p className="text-[11px] text-amber-700 leading-relaxed">
+                      Las siguientes recetas están configuradas para barras de tipo <strong className="capitalize">{bar?.type}</strong> pero necesitan insumos que aún no cargaste en esta barra.
+                    </p>
+                    <ul className="text-xs text-amber-700 space-y-1 pt-1">
+                      {recipeWarnings.map((w) => (
+                        <li key={w.recipeName} className="flex items-start gap-1.5">
+                          <span className="text-amber-500 mt-0.5">•</span>
+                          <span>
+                            <span className="font-semibold">{w.recipeName}</span>
+                            {' — necesita: '}
+                            {w.missingDrinks.map((d, i) => (
+                              <span key={d}>
+                                {i > 0 && ', '}
+                                <span className="font-medium">{d}</span>
+                              </span>
+                            ))}
+                            <span className="text-amber-500"> (para recetas)</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
             <StockTab eventId={eventIdNum} barId={barIdNum} />
           </TabsContent>
 

@@ -146,18 +146,21 @@ export function ActivateEventDialog({
                   No se puede activar el evento
                 </p>
                 <p className="text-xs text-amber-700">
-                  Hay recetas con insumos faltantes en barras. Cargá el stock necesario antes de activar.
+                  Algunas barras no tienen los ingredientes necesarios para preparar las recetas asignadas. Cargá el stock faltante antes de activar.
                 </p>
-                <ul className="text-xs text-amber-700 space-y-0.5 mt-1">
+                <ul className="text-xs text-amber-700 space-y-1 mt-1.5">
                   {recipeWarnings.map((w) => (
-                    <li key={`${w.recipeName}-${w.barId}`}>
-                      <span className="font-medium">{w.recipeName}</span>
-                      {' en '}
-                      <span className="font-medium">{w.barName}</span>
-                      {' ('}
-                      <span className="capitalize">{w.barType}</span>
-                      {'): faltan '}
-                      {w.missingDrinks.join(', ')}
+                    <li key={`${w.recipeName}-${w.barId}`} className="flex items-start gap-1.5">
+                      <span className="text-amber-500 mt-0.5">•</span>
+                      <span>
+                        <span className="font-semibold">{w.recipeName}</span>
+                        {' en '}
+                        <span className="font-semibold">{w.barName}</span>
+                        {' ('}
+                        <span className="capitalize">{w.barType}</span>
+                        {') — necesita: '}
+                        {w.missingDrinks.join(', ')}
+                      </span>
                     </li>
                   ))}
                 </ul>

@@ -83,7 +83,9 @@ export function InventoryLotDetailsSheet({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Tipo:</span>
                 <Badge variant="outline">
-                  {movement.type === 'adjustment' ? 'Ajuste' : 'Comprobante'}
+                  {movement.type === 'adjustment'
+                    ? (movement.notes?.toLowerCase().includes('descarte') ? 'Descarte' : 'Ajuste')
+                    : 'Comprobante'}
                 </Badge>
               </div>
               <div className="flex justify-between">

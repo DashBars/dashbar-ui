@@ -7,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead, useTableSort, sortItems } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -38,6 +39,7 @@ export function InventoryTable({
   onViewAllocations,
 }: InventoryTableProps) {
   const [search, setSearch] = useState('');
+  const { sortKey, sortDir, handleSort } = useTableSort();
 
   const filteredInventory = useMemo(() => {
     if (!search) return inventory;
@@ -50,6 +52,22 @@ export function InventoryTable({
         item.sku?.toLowerCase().includes(lowerSearch),
     );
   }, [inventory, search]);
+
+  const sortGetters: Record<string, (item: ManagerInventory) => string | number | null | undefined> = {
+    name: (item) => item.drink.name.toLowerCase(),
+    brand: (item) => item.drink.brand.toLowerCase(),
+    sku: (item) => item.sku || item.drink.sku || '',
+    volume: (item) => item.drink.volume,
+    supplier: (item) => item.supplier.name.toLowerCase(),
+    total: (item) => item.totalQuantity,
+    available: (item) => item.totalQuantity - item.allocatedQuantity,
+    allocated: (item) => item.allocatedQuantity,
+  };
+
+  const sortedInventory = useMemo(
+    () => sortItems(filteredInventory, sortKey, sortDir, sortGetters),
+    [filteredInventory, sortKey, sortDir],
+  );
 
   if (isLoading) {
     return (
@@ -99,26 +117,26 @@ export function InventoryTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Marca</TableHead>
-              <TableHead>SKU</TableHead>
-              <TableHead>Volumen (ml)</TableHead>
-              <TableHead>Proveedor</TableHead>
-              <TableHead>Cantidad Total</TableHead>
-              <TableHead>Disponible</TableHead>
-              <TableHead>Asignada</TableHead>
+              <SortableTableHead sortKey="name" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Nombre</SortableTableHead>
+              <SortableTableHead sortKey="brand" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Marca</SortableTableHead>
+              <SortableTableHead sortKey="sku" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>SKU</SortableTableHead>
+              <SortableTableHead sortKey="volume" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Volumen (ml)</SortableTableHead>
+              <SortableTableHead sortKey="supplier" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Proveedor</SortableTableHead>
+              <SortableTableHead sortKey="total" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Cantidad Total</SortableTableHead>
+              <SortableTableHead sortKey="available" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Disponible</SortableTableHead>
+              <SortableTableHead sortKey="allocated" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Asignada</SortableTableHead>
               <TableHead className="w-[70px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredInventory.length === 0 ? (
+            {sortedInventory.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                   No se encontraron insumos
                 </TableCell>
               </TableRow>
             ) : (
-              filteredInventory.map((item) => {
+              sortedInventory.map((item) => {
                 const availableQuantity = item.totalQuantity - item.allocatedQuantity;
                 return (
                   <TableRow key={item.id}>

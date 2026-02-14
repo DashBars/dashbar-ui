@@ -7,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead, useTableSort, sortItems } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -200,6 +201,7 @@ export function StockTable(props: StockTableProps) {
   const [search, setSearch] = useState('');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
   const [ownershipFilter, setOwnershipFilter] = useState<string>('all');
+  const { sortKey, sortDir, handleSort } = useTableSort();
 
   // Get unique suppliers from items (hook must be unconditional)
   const uniqueSuppliers = useMemo(() => {
@@ -250,16 +252,45 @@ export function StockTable(props: StockTableProps) {
     return filtered;
   }, [props.items, search, supplierFilter, ownershipFilter]);
 
+  // Sort getters for GlobalInventory
+  const globalSortGetters: Record<string, (item: GlobalInventory) => string | number | null | undefined> = {
+    name: (item) => item.drink?.name?.toLowerCase(),
+    supplier: (item) => item.supplier?.name?.toLowerCase(),
+    quantity: (item) => item.totalQuantity,
+    available: (item) => item.totalQuantity - item.allocatedQuantity,
+    allocated: (item) => item.allocatedQuantity,
+    cost: (item) => item.unitCost,
+    ownership: (item) => item.ownershipMode,
+  };
+
+  // Sort getters for Stock
+  const stockSortGetters: Record<string, (item: Stock) => string | number | null | undefined> = {
+    name: (item) => item.drink?.name?.toLowerCase(),
+    supplier: (item) => item.supplier?.name?.toLowerCase(),
+    quantity: (item) => item.quantity,
+    cost: (item) => item.unitCost,
+    salePrice: (item) => item.salePrice ?? 0,
+    ownership: (item) => item.ownershipMode,
+  };
+
+  // Apply sorting
+  const sortedItems = useMemo(() => {
+    if (mode === 'global') {
+      return sortItems(filteredItems as GlobalInventory[], sortKey, sortDir, globalSortGetters);
+    }
+    return sortItems(filteredItems as Stock[], sortKey, sortDir, stockSortGetters);
+  }, [filteredItems, sortKey, sortDir, mode]);
+
   // Separate bar stock by sellAsWholeUnit
   const directSaleItems = useMemo(() => {
     if (mode !== 'bar') return [];
-    return (filteredItems as Stock[]).filter((item) => item.sellAsWholeUnit === true);
-  }, [mode, filteredItems]);
+    return (sortedItems as Stock[]).filter((item) => item.sellAsWholeUnit === true);
+  }, [mode, sortedItems]);
 
   const recipeItems = useMemo(() => {
     if (mode !== 'bar') return [];
-    return (filteredItems as Stock[]).filter((item) => item.sellAsWholeUnit === false);
-  }, [mode, filteredItems]);
+    return (sortedItems as Stock[]).filter((item) => item.sellAsWholeUnit === false);
+  }, [mode, sortedItems]);
 
   const formatCurrency = (amount: number, currency: string = 'ARS') => {
     return `${currency} ${(amount / 100).toLocaleString('en-US', {
@@ -358,12 +389,12 @@ export function StockTable(props: StockTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Insumo</TableHead>
-            <TableHead>Proveedor</TableHead>
-            <TableHead>Cantidad</TableHead>
-            <TableHead>Costo Unit.</TableHead>
-            <TableHead>Precio Venta</TableHead>
-            <TableHead>Propiedad</TableHead>
+            <SortableTableHead sortKey="name" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Insumo</SortableTableHead>
+            <SortableTableHead sortKey="supplier" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Proveedor</SortableTableHead>
+            <SortableTableHead sortKey="quantity" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Cantidad</SortableTableHead>
+            <SortableTableHead sortKey="cost" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Costo Unit.</SortableTableHead>
+            <SortableTableHead sortKey="salePrice" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Precio Venta</SortableTableHead>
+            <SortableTableHead sortKey="ownership" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Propiedad</SortableTableHead>
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>
@@ -425,11 +456,11 @@ export function StockTable(props: StockTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Insumo</TableHead>
-            <TableHead>Proveedor</TableHead>
-            <TableHead>Cantidad</TableHead>
-            <TableHead>Costo Unit.</TableHead>
-            <TableHead>Propiedad</TableHead>
+            <SortableTableHead sortKey="name" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Insumo</SortableTableHead>
+            <SortableTableHead sortKey="supplier" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Proveedor</SortableTableHead>
+            <SortableTableHead sortKey="quantity" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Cantidad</SortableTableHead>
+            <SortableTableHead sortKey="cost" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Costo Unit.</SortableTableHead>
+            <SortableTableHead sortKey="ownership" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Propiedad</SortableTableHead>
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>
@@ -540,18 +571,18 @@ export function StockTable(props: StockTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Insumo</TableHead>
-              <TableHead>Proveedor</TableHead>
-              <TableHead>Cantidad</TableHead>
-              <TableHead>Disponible</TableHead>
-              <TableHead>Asignada</TableHead>
-              <TableHead>Costo Unit.</TableHead>
-              <TableHead>Propiedad</TableHead>
+              <SortableTableHead sortKey="name" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Insumo</SortableTableHead>
+              <SortableTableHead sortKey="supplier" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Proveedor</SortableTableHead>
+              <SortableTableHead sortKey="quantity" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Cantidad</SortableTableHead>
+              <SortableTableHead sortKey="available" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Disponible</SortableTableHead>
+              <SortableTableHead sortKey="allocated" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Asignada</SortableTableHead>
+              <SortableTableHead sortKey="cost" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Costo Unit.</SortableTableHead>
+              <SortableTableHead sortKey="ownership" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>Propiedad</SortableTableHead>
               <TableHead className="w-[70px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredItems.length === 0 ? (
+            {sortedItems.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={8}
@@ -561,7 +592,7 @@ export function StockTable(props: StockTableProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              (filteredItems as GlobalInventory[]).map((item) => {
+              (sortedItems as GlobalInventory[]).map((item) => {
                 const drink = item.drink;
                 const supplier = item.supplier;
                 const availableQuantity = item.totalQuantity - item.allocatedQuantity;
