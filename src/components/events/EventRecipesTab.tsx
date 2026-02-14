@@ -13,12 +13,13 @@ import { useBarTypeDrinks } from '@/hooks/useStock';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { BarType, EventRecipe } from '@/lib/api/types';
 import { toast } from 'sonner';
-import { X, Plus, Check, GlassWater, Snowflake, Info, Beaker, Pencil, ChevronRight, ChevronLeft, Layers, Store, AlertTriangle, Package, TrendingUp, Filter } from 'lucide-react';
+import { X, Plus, Check, GlassWater, Snowflake, Info, Beaker, Pencil, ChevronRight, ChevronLeft, Layers, Store, AlertTriangle, Package, TrendingUp, Filter, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 interface EventRecipesTabProps {
   eventId: number;
   isEditable: boolean;
+  onNavigateToBarras?: () => void;
 }
 
 const ALL_BAR_TYPES: BarType[] = ['VIP', 'general', 'backstage', 'lounge'];
@@ -30,7 +31,7 @@ const barTypeLabels: Record<BarType, string> = {
   lounge: 'Lounge',
 };
 
-export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
+export function EventRecipesTab({ eventId, isEditable, onNavigateToBarras }: EventRecipesTabProps) {
   const { data: recipes = [], isLoading } = useEventRecipes(eventId);
   const { data: bars = [] } = useBars(eventId);
   const createRecipe = useCreateRecipe(eventId);
@@ -79,12 +80,63 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
     return Array.from(names).sort();
   }, [recipes]);
 
+  // Map drink names to bars that have them in stock (for direct-sale display)
+  const directSaleBarMap = useMemo(() => {
+    const map = new Map<string, Array<{ barId: number; barName: string }>>();
+    bars.forEach((bar) => {
+      (bar.stocks || []).forEach((stock) => {
+        if (stock.sellAsWholeUnit && stock.drink?.name) {
+          const key = stock.drink.name.toLowerCase();
+          if (!map.has(key)) map.set(key, []);
+          const existing = map.get(key)!;
+          if (!existing.some((b) => b.barId === bar.id)) {
+            existing.push({ barId: bar.id, barName: bar.name });
+          }
+        }
+      });
+    });
+    return map;
+  }, [bars]);
+
+  // Map bar types to their recipe ingredient availability
+  const barTypeIngredientWarnings = useMemo(() => {
+    const warnings: Array<{ recipeName: string; barType: BarType; missingDrinks: string[] }> = [];
+    for (const recipe of recipes) {
+      const isDirectSale = recipe.components.length === 1 && recipe.components[0].percentage === 100;
+      if (isDirectSale) continue; // Skip direct-sale products
+
+      for (const bt of recipe.barTypes) {
+        // Find all bars of this type and their recipe-ingredient stocks
+        const barsOfType = bars.filter((b) => b.type === bt);
+        const missingDrinks: string[] = [];
+
+        for (const comp of recipe.components) {
+          const drinkName = comp.drink?.name;
+          if (!drinkName) continue;
+          // Check if ANY bar of this type has this ingredient for recipes
+          const hasIngredient = barsOfType.some((bar) =>
+            (bar.stocks || []).some(
+              (s) => !s.sellAsWholeUnit && s.drinkId === comp.drinkId && s.quantity > 0,
+            ),
+          );
+          if (!hasIngredient) {
+            missingDrinks.push(drinkName);
+          }
+        }
+
+        if (missingDrinks.length > 0) {
+          warnings.push({ recipeName: recipe.cocktailName, barType: bt, missingDrinks });
+        }
+      }
+    }
+    return warnings;
+  }, [recipes, bars]);
+
   const formatPrice = (cents: number) => {
     return `$${(cents / 100).toFixed(2)}`;
   };
 
   const handleOpenDialog = (recipe?: EventRecipe) => {
-    setStep(1);
     if (recipe) {
       setEditingRecipe(recipe);
       setCocktailName(recipe.cocktailName);
@@ -99,6 +151,10 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
       );
       // Pre-select the bar type from the recipe
       setSelectedBarType(recipe.barTypes.length > 0 ? recipe.barTypes[0] : '');
+
+      // Direct-sale products: skip to price step (only editable field)
+      const isDirectSaleRecipe = recipe.components.length === 1 && recipe.components[0].percentage === 100;
+      setStep(isDirectSaleRecipe ? 3 : 1);
     } else {
       setEditingRecipe(null);
       setCocktailName('');
@@ -107,9 +163,15 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
       setHasIce(false);
       setSelectedBarType('');
       setComponents([]);
+      setStep(1);
     }
     setDialogOpen(true);
   };
+
+  // Detect if we're editing a direct-sale recipe
+  const isEditingDirectSale = editingRecipe
+    ? editingRecipe.components.length === 1 && editingRecipe.components[0].percentage === 100
+    : false;
 
   const handleAddComponent = () => {
     setComponents([...components, { drinkId: '', percentage: '' }]);
@@ -208,19 +270,12 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
     const price = parseFloat(salePrice || '0');
     const barTypes: BarType[] = selectedBarType ? [selectedBarType] : [];
 
-    const dto = {
-      cocktailName: cocktailName.trim(),
-      glassVolume: parseInt(glassVolume, 10),
-      salePrice: price > 0 ? Math.round(price * 100) : 0,
-      hasIce,
-      barTypes: price > 0 ? barTypes : [],
-      components: components.map((c) => ({
-        drinkId: parseInt(c.drinkId, 10),
-        percentage: parseInt(c.percentage, 10),
-      })),
-    };
-
-    if (editingRecipe) {
+    if (editingRecipe && isEditingDirectSale) {
+      // Direct-sale products: only update the price (skip components/composition)
+      const dto = {
+        salePrice: price > 0 ? Math.round(price * 100) : 0,
+        barTypes: price > 0 ? barTypes : [],
+      };
       updateRecipe.mutate(dto, {
         onSuccess: () => {
           setDialogOpen(false);
@@ -228,11 +283,32 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
         },
       });
     } else {
-      createRecipe.mutate(dto, {
-        onSuccess: () => {
-          setDialogOpen(false);
-        },
-      });
+      const dto = {
+        cocktailName: cocktailName.trim(),
+        glassVolume: parseInt(glassVolume, 10),
+        salePrice: price > 0 ? Math.round(price * 100) : 0,
+        hasIce,
+        barTypes: price > 0 ? barTypes : [],
+        components: components.map((c) => ({
+          drinkId: parseInt(c.drinkId, 10),
+          percentage: parseInt(c.percentage, 10),
+        })),
+      };
+
+      if (editingRecipe) {
+        updateRecipe.mutate(dto, {
+          onSuccess: () => {
+            setDialogOpen(false);
+            setEditingRecipe(null);
+          },
+        });
+      } else {
+        createRecipe.mutate(dto, {
+          onSuccess: () => {
+            setDialogOpen(false);
+          },
+        });
+      }
     }
   };
 
@@ -387,6 +463,24 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
         </div>
       )}
 
+      {/* Ingredient availability warnings */}
+      {!isLoading && barTypeIngredientWarnings.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 p-3 space-y-1.5">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+            <div className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
+              <p className="font-medium">Faltan insumos para algunas recetas</p>
+              {barTypeIngredientWarnings.map((w, i) => (
+                <p key={i}>
+                  <strong>{w.recipeName}</strong> en barras <strong>{barTypeLabels[w.barType]}</strong>: falta{w.missingDrinks.length > 1 ? 'n' : ''}{' '}
+                  {w.missingDrinks.join(', ')}
+                </p>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Recipe cards grid */}
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -404,9 +498,17 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
                 : 'Todavia no hay recetas configuradas para este evento.'}
             </p>
             {isEditable && cardFilter === 'all' && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Carga stock a las barras primero y luego crea recetas con esos insumos.
-              </p>
+              <div className="flex flex-col items-center gap-2 mt-2">
+                <p className="text-xs text-muted-foreground">
+                  Carga stock a las barras primero y luego crea recetas con esos insumos.
+                </p>
+                {onNavigateToBarras && (
+                  <Button variant="outline" size="sm" onClick={onNavigateToBarras}>
+                    <ArrowRight className="mr-2 h-4 w-4" />
+                    Ir a cargar stock
+                  </Button>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -516,16 +618,38 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
                     )}
                   </div>
 
-                  {/* Bar types */}
-                  {recipe.barTypes.length > 0 && (
-                    <div className="flex items-center gap-1.5 mt-auto pt-3 border-t mt-3">
-                      <span className="text-xs text-muted-foreground">Barras:</span>
-                      {recipe.barTypes.map((bt) => (
-                        <Badge key={bt} variant="outline" className="text-xs py-0">
-                          {barTypeLabels[bt]}
-                        </Badge>
-                      ))}
-                    </div>
+                  {/* Bar availability */}
+                  {isDirectSale ? (
+                    (() => {
+                      const barsWithProduct = directSaleBarMap.get(recipe.cocktailName.toLowerCase()) || [];
+                      return barsWithProduct.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-auto pt-3 border-t mt-3">
+                          <span className="text-xs text-muted-foreground">Disponible en:</span>
+                          {barsWithProduct.map((b) => (
+                            <Badge key={b.barId} variant="outline" className="text-xs py-0">
+                              {b.barName}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 mt-auto pt-3 border-t mt-3">
+                          <span className="text-xs text-muted-foreground italic">
+                            Sin stock asignado a barras
+                          </span>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    recipe.barTypes.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 mt-auto pt-3 border-t mt-3">
+                        <span className="text-xs text-muted-foreground">Barras:</span>
+                        {recipe.barTypes.map((bt) => (
+                          <Badge key={bt} variant="outline" className="text-xs py-0">
+                            {barTypeLabels[bt]}
+                          </Badge>
+                        ))}
+                      </div>
+                    )
                   )}
 
                   {/* Actions */}
@@ -560,46 +684,58 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingRecipe ? 'Editar receta' : 'Nueva receta'}</DialogTitle>
+            <DialogTitle>
+              {isEditingDirectSale
+                ? `Editar precio — ${editingRecipe?.cocktailName}`
+                : editingRecipe ? 'Editar receta' : 'Nueva receta'}
+            </DialogTitle>
             <DialogDescription>
-              {step === 1 && 'Paso 1 de 3 — Tipo de barra, nombre del trago y volumen del vaso.'}
-              {step === 2 && 'Paso 2 de 3 — Agrega los componentes usando los insumos de las barras.'}
-              {step === 3 && 'Paso 3 de 3 — Configura el precio de venta.'}
+              {isEditingDirectSale
+                ? 'Modificá el precio de venta de este producto de venta directa.'
+                : (
+                  <>
+                    {step === 1 && 'Paso 1 de 3 — Tipo de barra, nombre del trago y volumen del vaso.'}
+                    {step === 2 && 'Paso 2 de 3 — Agrega los componentes usando los insumos de las barras.'}
+                    {step === 3 && 'Paso 3 de 3 — Configura el precio de venta.'}
+                  </>
+                )}
             </DialogDescription>
           </DialogHeader>
 
-          {/* Stepper indicator */}
-          <div className="flex items-center gap-2 mb-2">
-            <div
-              className={cn(
-                'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                step >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-              )}
-            >
-              <Store className="h-3.5 w-3.5" />
-              Tipo de barra
+          {/* Stepper indicator — hidden for direct-sale edits */}
+          {!isEditingDirectSale && (
+            <div className="flex items-center gap-2 mb-2">
+              <div
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                  step >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                )}
+              >
+                <Store className="h-3.5 w-3.5" />
+                Tipo de barra
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <div
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                  step >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                )}
+              >
+                <Beaker className="h-3.5 w-3.5" />
+                Componentes
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <div
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                  step >= 3 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                )}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                Precio
+              </div>
             </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            <div
-              className={cn(
-                'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                step >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-              )}
-            >
-              <Beaker className="h-3.5 w-3.5" />
-              Componentes
-            </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            <div
-              className={cn(
-                'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                step >= 3 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-              )}
-            >
-              <Layers className="h-3.5 w-3.5" />
-              Precio
-            </div>
-          </div>
+          )}
 
           {/* Step 1: Bar type + basic info */}
           {step === 1 && (
@@ -678,6 +814,20 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
                         Las barras de tipo "{barTypeLabels[selectedBarType]}" tienen {barTypeDrinks.length} insumo{barTypeDrinks.length !== 1 ? 's' : ''} para recetas.
                         Carga mas stock como "Para recetas" desde la tab "Barras" usando "Cargar Stock a Barras".
                       </p>
+                      {onNavigateToBarras && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                          onClick={() => {
+                            setDialogOpen(false);
+                            onNavigateToBarras();
+                          }}
+                        >
+                          <ArrowRight className="mr-2 h-3.5 w-3.5" />
+                          Ir a cargar stock
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -969,23 +1119,42 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
           {step === 3 && (
             <div className="space-y-4">
               {/* Recipe summary */}
-              <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-                <p className="text-sm font-medium">{cocktailName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {glassVolume}ml · {components.length} componentes{hasIce ? ' · Con hielo' : ''} · Barras {selectedBarType ? barTypeLabels[selectedBarType] : ''}
-                </p>
-                <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
-                  {components.map((c, i) => {
-                    const drink = barTypeDrinks.find((d) => d.drinkId.toString() === c.drinkId);
-                    return (
-                      <div key={i} className="flex justify-between">
-                        <span>{drink?.name || 'Insumo'}</span>
-                        <span>{c.percentage}%</span>
-                      </div>
-                    );
-                  })}
+              {isEditingDirectSale ? (
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center shrink-0">
+                      <Package className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <p className="text-sm font-medium">{cocktailName}</p>
+                    <Badge variant="secondary" className="text-xs py-0 bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300">
+                      Venta directa
+                    </Badge>
+                  </div>
+                  {selectedBarType && (
+                    <p className="text-xs text-muted-foreground">
+                      Barras: {barTypeLabels[selectedBarType]}
+                    </p>
+                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                  <p className="text-sm font-medium">{cocktailName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {glassVolume}ml · {components.length} componentes{hasIce ? ' · Con hielo' : ''} · Barras {selectedBarType ? barTypeLabels[selectedBarType] : ''}
+                  </p>
+                  <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
+                    {components.map((c, i) => {
+                      const drink = barTypeDrinks.find((d) => d.drinkId.toString() === c.drinkId);
+                      return (
+                        <div key={i} className="flex justify-between">
+                          <span>{drink?.name || 'Insumo'}</span>
+                          <span>{c.percentage}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Estimated cost breakdown */}
               {estimatedCost && estimatedCost.totalCostCents > 0 && (
@@ -1096,10 +1265,16 @@ export function EventRecipesTab({ eventId, isEditable }: EventRecipesTabProps) {
             )}
             {step === 3 && (
               <>
-                <Button type="button" variant="outline" onClick={() => setStep(2)}>
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Volver
-                </Button>
+                {isEditingDirectSale ? (
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                ) : (
+                  <Button type="button" variant="outline" onClick={() => setStep(2)}>
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Volver
+                  </Button>
+                )}
                 <Button
                   type="button"
                   onClick={handleSubmit}

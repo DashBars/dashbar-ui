@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useGlobalInventory } from '@/hooks/useGlobalInventory';
+import { useEventRecipes } from '@/hooks/useRecipes';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { stockMovementsApi } from '@/lib/api/dashbar';
 import type { AssignStockDto, Bar, GlobalInventory } from '@/lib/api/types';
@@ -35,6 +37,8 @@ import {
   Check,
   Search,
   TrendingUp,
+  ExternalLink,
+  Info,
 } from 'lucide-react';
 
 interface AssignStockWizardProps {
@@ -62,8 +66,10 @@ export function AssignStockWizard({
   open,
   onOpenChange,
 }: AssignStockWizardProps) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: inventory = [], isLoading: isLoadingInventory } = useGlobalInventory();
+  const { data: eventRecipes = [] } = useEventRecipes(eventId);
 
   const [step, setStep] = useState(1);
   const [selectedBarId, setSelectedBarId] = useState<number | null>(null);
@@ -165,11 +171,43 @@ export function AssignStockWizard({
         const config = next.get(id);
         if (config) {
           next.set(id, { ...config, [field]: value });
+
+          // When changing salePrice on a direct-sale item, sync to all other
+          // items with the same drink name that are also direct-sale
+          if (field === 'salePrice' && config.sellAsWholeUnit && typeof value === 'string') {
+            for (const [otherId, otherConfig] of next) {
+              if (
+                otherId !== id &&
+                otherConfig.sellAsWholeUnit &&
+                otherConfig.drink.name.toLowerCase() === config.drink.name.toLowerCase()
+              ) {
+                next.set(otherId, { ...otherConfig, salePrice: value });
+              }
+            }
+          }
         }
         return next;
       });
     },
     [],
+  );
+
+  // Get the price already set in this wizard batch for a given drink name
+  const getWizardBatchPrice = useCallback(
+    (drinkName: string): string | null => {
+      for (const [, config] of itemConfigs) {
+        if (
+          config.sellAsWholeUnit &&
+          config.drink.name.toLowerCase() === drinkName.toLowerCase() &&
+          config.salePrice &&
+          parseFloat(config.salePrice) > 0
+        ) {
+          return config.salePrice;
+        }
+      }
+      return null;
+    },
+    [itemConfigs],
   );
 
   const goToStep = (newStep: number) => {
@@ -240,6 +278,7 @@ export function AssignStockWizard({
       queryClient.invalidateQueries({ queryKey: ['stock'] });
       queryClient.invalidateQueries({ queryKey: ['bars'] });
       queryClient.invalidateQueries({ queryKey: ['global-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
       toast.success(
         `${successCount} item${successCount > 1 ? 's' : ''} asignado${successCount > 1 ? 's' : ''} a ${selectedBar?.name}`,
       );
@@ -255,6 +294,21 @@ export function AssignStockWizard({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
+
+  // Find existing direct-sale recipe price for a drink name
+  const getExistingDirectSalePrice = useCallback(
+    (drinkName: string): number | null => {
+      const match = eventRecipes.find(
+        (r) =>
+          r.cocktailName.toLowerCase() === drinkName.toLowerCase() &&
+          r.components.length === 1 &&
+          r.components[0].percentage === 100 &&
+          r.salePrice > 0,
+      );
+      return match ? match.salePrice : null;
+    },
+    [eventRecipes],
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -373,10 +427,32 @@ export function AssignStockWizard({
                   ))}
                 </div>
               ) : filteredInventory.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  {searchFilter
-                    ? 'No se encontraron items con ese filtro'
-                    : 'No hay stock disponible en el inventario global'}
+                <div className="text-center py-8">
+                  {searchFilter ? (
+                    <p className="text-muted-foreground">No se encontraron items con ese filtro</p>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                        <Package className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <p className="text-muted-foreground font-medium">
+                        No hay stock disponible en el inventario global
+                      </p>
+                      <p className="text-sm text-muted-foreground max-w-sm">
+                        Para asignar stock a las barras, primero necesitás registrar compras de insumos en el inventario global.
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          onOpenChange(false);
+                          navigate('/suppliers?tab=global-stock');
+                        }}
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Ir al inventario global
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="rounded-lg border max-h-[40vh] overflow-y-auto">
@@ -396,7 +472,7 @@ export function AssignStockWizard({
                           className="cursor-pointer"
                           onClick={() => toggleInventoryItem(item.id)}
                         >
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                               checked={selectedInventoryIds.has(item.id)}
                               onCheckedChange={() => toggleInventoryItem(item.id)}
@@ -431,6 +507,28 @@ export function AssignStockWizard({
               {Array.from(itemConfigs.entries()).map(([id, config]) => {
                 const unitCostInPesos = config.unitCost / 100;
                 const salePriceNum = parseFloat(config.salePrice);
+                const existingPriceCents = config.sellAsWholeUnit
+                  ? getExistingDirectSalePrice(config.drink.name)
+                  : null;
+                const hasExistingPrice = existingPriceCents !== null;
+                // Check if another item in this batch already set a price for same product
+                const hasSiblingPrice = !hasExistingPrice && config.sellAsWholeUnit
+                  ? (() => {
+                      for (const [otherId, otherConfig] of itemConfigs) {
+                        if (
+                          otherId !== id &&
+                          otherConfig.sellAsWholeUnit &&
+                          otherConfig.drink.name.toLowerCase() === config.drink.name.toLowerCase() &&
+                          otherConfig.salePrice &&
+                          parseFloat(otherConfig.salePrice) > 0
+                        ) {
+                          return true;
+                        }
+                      }
+                      return false;
+                    })()
+                  : false;
+                const isPriceLocked = hasExistingPrice;
                 const profitMargin =
                   config.sellAsWholeUnit && salePriceNum > 0 && unitCostInPesos > 0
                     ? {
@@ -481,7 +579,19 @@ export function AssignStockWizard({
                       </button>
                       <button
                         type="button"
-                        onClick={() => updateConfig(id, 'sellAsWholeUnit', true)}
+                        onClick={() => {
+                          updateConfig(id, 'sellAsWholeUnit', true);
+                          // Auto-fill price: first check existing recipe, then check wizard batch
+                          const existingPrice = getExistingDirectSalePrice(config.drink.name);
+                          if (existingPrice) {
+                            updateConfig(id, 'salePrice', (existingPrice / 100).toString());
+                          } else {
+                            const batchPrice = getWizardBatchPrice(config.drink.name);
+                            if (batchPrice) {
+                              updateConfig(id, 'salePrice', batchPrice);
+                            }
+                          }
+                        }}
                         disabled={isAssigning}
                         className={`flex items-center gap-2.5 p-3 rounded-lg border text-left transition-all ${
                           config.sellAsWholeUnit
@@ -527,13 +637,43 @@ export function AssignStockWizard({
                             min="0"
                             step="0.01"
                             value={config.salePrice}
-                            onChange={(e) => updateConfig(id, 'salePrice', e.target.value)}
+                            onChange={(e) => {
+                              if (!isPriceLocked) {
+                                updateConfig(id, 'salePrice', e.target.value);
+                              }
+                            }}
                             placeholder="Ej: 5.00"
-                            disabled={isAssigning}
+                            disabled={isAssigning || isPriceLocked}
+                            className={isPriceLocked ? 'bg-muted cursor-not-allowed' : ''}
                           />
                         </div>
                       )}
                     </div>
+
+                    {/* Existing price info banner */}
+                    {config.sellAsWholeUnit && hasExistingPrice && (
+                      <div className="flex items-start gap-2 text-sm rounded-lg px-3 py-2 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                        <div>
+                          <span>
+                            Este producto ya tiene precio asignado: <strong>${(existingPriceCents! / 100).toFixed(2)}</strong>
+                          </span>
+                          <p className="text-xs mt-1 opacity-80">
+                            Para modificar el precio, editá la receta desde "Recetas y Productos".
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sibling price sync banner (same product from different supplier) */}
+                    {config.sellAsWholeUnit && !hasExistingPrice && hasSiblingPrice && (
+                      <div className="flex items-start gap-2 text-sm rounded-lg px-3 py-2 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                        <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                        <p className="text-xs">
+                          El precio se sincroniza con las otras unidades de <strong>{config.drink.name}</strong> para mantener un precio único de venta.
+                        </p>
+                      </div>
+                    )}
 
                     {/* Profit margin — only for direct sale */}
                     {config.sellAsWholeUnit && profitMargin && (

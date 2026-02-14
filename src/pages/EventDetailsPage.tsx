@@ -23,7 +23,8 @@ import { BarsTable } from '@/components/bars/BarsTable';
 import { BarFormDialog } from '@/components/bars/BarFormDialog';
 import { useBars } from '@/hooks/useBars';
 import type { Event as ApiEvent, EventStatus, Bar, BarType, BarStatus } from '@/lib/api/types';
-import { ChevronRight, Calendar, MapPin, Trash2, Play, Cog, Pencil, ArrowLeft } from 'lucide-react';
+import { ChevronRight, Calendar, MapPin, Trash2, Play, Cog, Pencil, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { useEventRecipes } from '@/hooks/useRecipes';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -98,12 +99,68 @@ export function EventDetailsPage() {
   
   // Bars state
   const { data: bars, isLoading: isLoadingBars } = useBars(eventIdNum);
+  const { data: eventRecipes = [] } = useEventRecipes(eventIdNum);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<BarType | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<BarStatus | 'all'>('all');
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingBar, setEditingBar] = useState<Bar | null>(null);
   const [stockWizardOpen, setStockWizardOpen] = useState(false);
+
+  // Compute recipe ingredient warnings per bar type at the event level
+  const eventRecipeWarnings = useMemo(() => {
+    if (!bars || !eventRecipes.length) return [];
+    const warnings: Array<{ recipeName: string; barType: string; missingDrinks: string[] }> = [];
+
+    for (const recipe of eventRecipes) {
+      const isDirectSale = recipe.components.length === 1 && recipe.components[0].percentage === 100;
+      if (isDirectSale) continue;
+
+      for (const barType of recipe.barTypes) {
+        // Find all bars of this type
+        const typeBars = bars.filter((b) => b.type === barType);
+        if (typeBars.length === 0) continue;
+
+        // Check if ANY bar of this type has all required ingredients
+        const anyBarHasAll = typeBars.some((bar) => {
+          return recipe.components.every((comp) => {
+            return (bar.stocks || []).some(
+              (s) => !s.sellAsWholeUnit && s.drinkId === comp.drinkId && s.quantity > 0,
+            );
+          });
+        });
+
+        if (!anyBarHasAll) {
+          // Find which drinks are missing across all bars of this type
+          const allTypeStocks = typeBars.flatMap((b) => b.stocks || []);
+          const missingDrinks: string[] = [];
+          for (const comp of recipe.components) {
+            const hasIt = allTypeStocks.some(
+              (s) => !s.sellAsWholeUnit && s.drinkId === comp.drinkId && s.quantity > 0,
+            );
+            if (!hasIt && comp.drink?.name) {
+              missingDrinks.push(comp.drink.name);
+            }
+          }
+          if (missingDrinks.length > 0) {
+            warnings.push({ recipeName: recipe.cocktailName, barType, missingDrinks });
+          }
+        }
+      }
+    }
+    return warnings;
+  }, [bars, eventRecipes]);
+
+  // Map from bar type to list of bars for CTA navigation
+  const barsByType = useMemo(() => {
+    if (!bars) return {};
+    const map: Record<string, Array<{ barId: number; barName: string }>> = {};
+    for (const bar of bars) {
+      if (!map[bar.type]) map[bar.type] = [];
+      map[bar.type].push({ barId: bar.id, barName: bar.name });
+    }
+    return map;
+  }, [bars]);
 
   const filteredBars = useMemo(() => {
     if (!bars) return [];
@@ -227,6 +284,9 @@ export function EventDetailsPage() {
                 <DropdownMenuItem onClick={() => setActivateDialogOpen(true)}>
                   <Play className="mr-2 h-4 w-4 text-emerald-600" />
                   Activar evento
+                  {eventRecipeWarnings.length > 0 && (
+                    <AlertTriangle className="ml-auto h-3.5 w-3.5 text-amber-500" />
+                  )}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => {
@@ -324,6 +384,8 @@ export function EventDetailsPage() {
             onLoadStock={() => setStockWizardOpen(true)}
             isEditable={status === 'upcoming'}
             hasBars={(bars || []).length > 0}
+            recipeWarnings={eventRecipeWarnings}
+            barsByType={barsByType}
           />
           <BarsSummaryCards bars={bars || []} isLoading={isLoadingBars} />
           <BarsFilters
@@ -338,11 +400,16 @@ export function EventDetailsPage() {
             bars={filteredBars}
             isLoading={isLoadingBars}
             onViewDetails={handleBarClick}
+            recipeWarnings={eventRecipeWarnings}
           />
         </TabsContent>
 
         <TabsContent value="recipes" className="space-y-4">
-          <EventRecipesTab eventId={eventIdNum} isEditable={status === 'upcoming'} />
+          <EventRecipesTab
+            eventId={eventIdNum}
+            isEditable={status === 'upcoming'}
+            onNavigateToBarras={() => setActiveTab('bars')}
+          />
         </TabsContent>
 
         <TabsContent value="pos" className="space-y-4">
@@ -376,6 +443,7 @@ export function EventDetailsPage() {
           event={event}
           open={activateDialogOpen}
           onOpenChange={setActivateDialogOpen}
+          recipeWarnings={eventRecipeWarnings}
         />
       )}
 

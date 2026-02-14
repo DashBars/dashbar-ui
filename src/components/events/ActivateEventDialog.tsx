@@ -14,18 +14,26 @@ import { useActivateEvent } from '@/hooks/useEvents';
 import { useBars } from '@/hooks/useBars';
 import type { Bar } from '@/lib/api/types';
 import type { Event } from '@/lib/api/types';
-import { Play, Loader2 } from 'lucide-react';
+import { Play, Loader2, AlertTriangle } from 'lucide-react';
+
+interface RecipeWarning {
+  recipeName: string;
+  barType: string;
+  missingDrinks: string[];
+}
 
 interface ActivateEventDialogProps {
   event: Event;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  recipeWarnings?: RecipeWarning[];
 }
 
 export function ActivateEventDialog({
   event,
   open,
   onOpenChange,
+  recipeWarnings = [],
 }: ActivateEventDialogProps) {
   const { mutate: activateEvent, isPending } = useActivateEvent();
   const { data: bars = [], isLoading: isLoadingBars } = useBars(event.id);
@@ -127,6 +135,33 @@ export function ActivateEventDialog({
             </div>
           )}
         </div>
+        {recipeWarnings.length > 0 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-amber-800">
+                  No se puede activar el evento
+                </p>
+                <p className="text-xs text-amber-700">
+                  Hay recetas con insumos faltantes en barras. Cargá el stock necesario antes de activar.
+                </p>
+                <ul className="text-xs text-amber-700 space-y-0.5 mt-1">
+                  {recipeWarnings.map((w) => (
+                    <li key={`${w.recipeName}-${w.barType}`}>
+                      <span className="font-medium">{w.recipeName}</span>
+                      {' en barras '}
+                      <span className="font-medium capitalize">{w.barType}</span>
+                      {': faltan '}
+                      {w.missingDrinks.join(', ')}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         <DialogFooter>
           <Button
             variant="outline"
@@ -135,7 +170,10 @@ export function ActivateEventDialog({
           >
             Cancelar
           </Button>
-          <Button onClick={handleConfirm} disabled={isPending || (!openAllBars && selectedBarIds.length === 0)}>
+          <Button
+            onClick={handleConfirm}
+            disabled={isPending || recipeWarnings.length > 0 || (!openAllBars && selectedBarIds.length === 0)}
+          >
             {isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

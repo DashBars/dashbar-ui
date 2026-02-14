@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MoreHorizontal, ArrowRight, ArrowLeft, ArrowUpDown, Package, Beaker } from 'lucide-react';
+import { MoreHorizontal, ArrowRight, ArrowLeft, ArrowUpDown, Package, Beaker, ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { GlobalInventory, Stock } from '@/lib/api/types';
 
@@ -51,6 +51,147 @@ type StockTableProps = GlobalStockTableProps | BarStockTableProps;
 
 function isGlobalInventory(item: GlobalInventory | Stock): item is GlobalInventory {
   return (item as GlobalInventory).totalQuantity !== undefined;
+}
+
+/** Collapsible stacked layout for bar stock sections */
+function BarStockView({
+  search,
+  onSearchChange,
+  supplierFilter,
+  onSupplierFilterChange,
+  ownershipFilter,
+  onOwnershipFilterChange,
+  uniqueSuppliers,
+  directSaleItems,
+  recipeItems,
+  renderDirectSaleTable,
+  renderRecipeTable,
+}: {
+  search: string;
+  onSearchChange: (v: string) => void;
+  supplierFilter: string;
+  onSupplierFilterChange: (v: string) => void;
+  ownershipFilter: string;
+  onOwnershipFilterChange: (v: string) => void;
+  uniqueSuppliers: Array<{ id: number; name: string }>;
+  directSaleItems: Stock[];
+  recipeItems: Stock[];
+  renderDirectSaleTable: (items: Stock[], emptyMessage: string) => JSX.Element;
+  renderRecipeTable: (items: Stock[], emptyMessage: string) => JSX.Element;
+}) {
+  const [showDirectSale, setShowDirectSale] = useState(true);
+  const [showRecipe, setShowRecipe] = useState(true);
+
+  return (
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <Input
+          placeholder="Buscar por nombre, marca, proveedor..."
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="max-w-sm"
+        />
+        <Select value={supplierFilter} onValueChange={onSupplierFilterChange}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Todos los proveedores" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los proveedores</SelectItem>
+            {uniqueSuppliers.map((supplier) => (
+              <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                {supplier.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={ownershipFilter} onValueChange={onOwnershipFilterChange}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Todos los tipos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los tipos</SelectItem>
+            <SelectItem value="purchased">Comprado</SelectItem>
+            <SelectItem value="consignment">Consignación</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Direct Sale Section — collapsible */}
+      <Card className="rounded-2xl">
+        <CardHeader
+          className="cursor-pointer select-none py-4"
+          onClick={() => setShowDirectSale((p) => !p)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                <Package className="h-4 w-4 text-green-600" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-semibold">Venta directa</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Se venden como unidad completa
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs">
+                {directSaleItems.length}
+              </Badge>
+              {showDirectSale ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        {showDirectSale && (
+          <CardContent className="pt-0">
+            {renderDirectSaleTable(directSaleItems, 'No hay insumos para venta directa')}
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Recipe Stock Section — collapsible */}
+      <Card className="rounded-2xl">
+        <CardHeader
+          className="cursor-pointer select-none py-4"
+          onClick={() => setShowRecipe((p) => !p)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <Beaker className="h-4 w-4 text-blue-600" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-semibold">Para recetas</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Ingredientes para preparar cocktails
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs">
+                {recipeItems.length}
+              </Badge>
+              {showRecipe ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        {showRecipe && (
+          <CardContent className="pt-0">
+            {renderRecipeTable(recipeItems, 'No hay insumos para recetas')}
+          </CardContent>
+        )}
+      </Card>
+    </div>
+  );
 }
 
 export function StockTable(props: StockTableProps) {
@@ -241,8 +382,13 @@ export function StockTable(props: StockTableProps) {
               const itemKey = `${item.barId}-${item.drinkId}-${item.supplierId}-${item.sellAsWholeUnit}`;
               return (
                 <TableRow key={itemKey}>
-                  <TableCell className="font-medium">
-                    {item.drink?.name || `Insumo ${item.drinkId}`}
+                  <TableCell>
+                    <div className="font-medium">{item.drink?.name || `Insumo ${item.drinkId}`}</div>
+                    {item.drink?.brand && (
+                      <div className="text-xs text-muted-foreground">
+                        {item.drink.brand} — {item.drink.volume}ml
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     {item.supplier?.name || `Proveedor ${item.supplierId}`}
@@ -302,8 +448,13 @@ export function StockTable(props: StockTableProps) {
               const itemKey = `${item.barId}-${item.drinkId}-${item.supplierId}-${item.sellAsWholeUnit}`;
               return (
                 <TableRow key={itemKey}>
-                  <TableCell className="font-medium">
-                    {item.drink?.name || `Insumo ${item.drinkId}`}
+                  <TableCell>
+                    <div className="font-medium">{item.drink?.name || `Insumo ${item.drinkId}`}</div>
+                    {item.drink?.brand && (
+                      <div className="text-xs text-muted-foreground">
+                        {item.drink.brand} — {item.drink.volume}ml
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     {item.supplier?.name || `Proveedor ${item.supplierId}`}
@@ -331,83 +482,21 @@ export function StockTable(props: StockTableProps) {
     </div>
   );
 
-  // Bar mode: render two separate sections
+  // Bar mode: render two collapsible stacked sections
   if (mode === 'bar') {
-    return (
-      <div className="space-y-6">
-        {/* Filters */}
-        <div className="flex gap-4">
-          <Input
-            placeholder="Buscar por nombre, marca, proveedor..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-sm"
-          />
-          <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Todos los proveedores" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los proveedores</SelectItem>
-              {uniqueSuppliers.map((supplier) => (
-                <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                  {supplier.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={ownershipFilter} onValueChange={setOwnershipFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Todos los tipos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los tipos</SelectItem>
-              <SelectItem value="purchased">Comprado</SelectItem>
-              <SelectItem value="consignment">Consignación</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Side by side: Direct Sale + Recipe Stock */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Direct Sale Stock */}
-          <Card className="rounded-2xl flex flex-col">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Package className="h-5 w-5 text-green-600" />
-                Venta directa
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Se venden como unidad completa
-              </p>
-            </CardHeader>
-            <CardContent className="pt-0 flex-1 min-h-0">
-              <div className="max-h-[40vh] overflow-y-auto rounded-lg">
-                {renderDirectSaleTable(directSaleItems, 'No hay insumos para venta directa')}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Recipe Components Stock */}
-          <Card className="rounded-2xl flex flex-col">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Beaker className="h-5 w-5 text-blue-600" />
-                Para recetas
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Ingredientes para preparar cocktails
-              </p>
-            </CardHeader>
-            <CardContent className="pt-0 flex-1 min-h-0">
-              <div className="max-h-[40vh] overflow-y-auto rounded-lg">
-                {renderRecipeTable(recipeItems, 'No hay insumos para recetas')}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
+    return <BarStockView
+      search={search}
+      onSearchChange={setSearch}
+      supplierFilter={supplierFilter}
+      onSupplierFilterChange={setSupplierFilter}
+      ownershipFilter={ownershipFilter}
+      onOwnershipFilterChange={setOwnershipFilter}
+      uniqueSuppliers={uniqueSuppliers}
+      directSaleItems={directSaleItems}
+      recipeItems={recipeItems}
+      renderDirectSaleTable={renderDirectSaleTable}
+      renderRecipeTable={renderRecipeTable}
+    />;
   }
 
   // Global mode: render single table
@@ -479,8 +568,13 @@ export function StockTable(props: StockTableProps) {
 
                 return (
                   <TableRow key={item.id}>
-                    <TableCell className="font-medium">
-                      {drink?.name || `Insumo ${item.drinkId}`}
+                    <TableCell>
+                      <div className="font-medium">{drink?.name || `Insumo ${item.drinkId}`}</div>
+                      {drink?.brand && (
+                        <div className="text-xs text-muted-foreground">
+                          {drink.brand} — {drink.volume}ml
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       {supplier?.name ||

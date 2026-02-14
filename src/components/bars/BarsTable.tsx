@@ -3,12 +3,19 @@ import { Button } from '@/components/ui/button';
 import type { Bar } from '@/lib/api/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
-import { Wine, Monitor, Package, ChevronRight } from 'lucide-react';
+import { Wine, Monitor, ShoppingBag, Beaker, ChevronRight, AlertTriangle } from 'lucide-react';
+
+export interface BarRecipeWarning {
+  recipeName: string;
+  barType: string;
+  missingDrinks: string[];
+}
 
 interface BarsTableProps {
   bars: Bar[] | undefined;
   isLoading: boolean;
   onViewDetails: (bar: Bar) => void;
+  recipeWarnings?: BarRecipeWarning[];
 }
 
 const barTypeStyles: Record<string, { badge: 'default' | 'secondary' | 'outline'; icon: string }> = {
@@ -25,7 +32,7 @@ const statusConfig: Record<string, { label: string; dot: string; badge: 'default
 };
 
 export function BarsTable(props: BarsTableProps) {
-  const { bars, isLoading, onViewDetails } = props;
+  const { bars, isLoading, onViewDetails, recipeWarnings = [] } = props;
 
   if (isLoading) {
     return (
@@ -56,12 +63,17 @@ export function BarsTable(props: BarsTableProps) {
         const typeStyle = barTypeStyles[bar.type] || barTypeStyles.general;
         const statusCfg = statusConfig[bar.status] || statusConfig.closed;
         const posCount = bar.posnets?.length || 0;
-        const stockCount = bar.stocks?.length || 0;
+        const stocks = bar.stocks || [];
+        const directSaleCount = stocks.filter((s) => s.sellAsWholeUnit).length;
+        const recipeCount = stocks.filter((s) => !s.sellAsWholeUnit).length;
+
+        // Warnings for this specific bar's type
+        const barWarnings = recipeWarnings.filter((w) => w.barType === bar.type);
 
         return (
           <Card
             key={bar.id}
-            className="rounded-xl cursor-pointer hover:bg-muted/30 transition-colors border"
+            className={`rounded-xl cursor-pointer hover:bg-muted/30 transition-colors border ${barWarnings.length > 0 ? 'border-amber-300' : ''}`}
             onClick={() => onViewDetails(bar)}
           >
             <CardContent className="px-4 py-3">
@@ -78,10 +90,21 @@ export function BarsTable(props: BarsTableProps) {
                     <Badge variant={typeStyle.badge} className="text-[10px] px-1.5 py-0 shrink-0">
                       {bar.type}
                     </Badge>
+                    {barWarnings.length > 0 && (
+                      <span className="flex items-center gap-1 text-amber-600 shrink-0" title={`${barWarnings.length} receta(s) sin insumos`}>
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        <span className="text-[10px] font-medium">{barWarnings.length}</span>
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className={`h-1.5 w-1.5 rounded-full ${statusCfg.dot}`} />
                     <span className="text-xs text-muted-foreground">{statusCfg.label}</span>
+                    {barWarnings.length > 0 && (
+                      <span className="text-[10px] text-amber-600 ml-1">
+                        Faltan insumos
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -91,9 +114,13 @@ export function BarsTable(props: BarsTableProps) {
                     <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
                     <span className={posCount > 0 ? 'font-medium' : 'text-muted-foreground'}>{posCount}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-sm" title="Insumos en stock">
-                    <Package className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className={stockCount > 0 ? 'font-medium' : 'text-muted-foreground'}>{stockCount}</span>
+                  <div className="flex items-center gap-1.5 text-sm" title="Venta directa">
+                    <ShoppingBag className="h-3.5 w-3.5 text-green-600" />
+                    <span className={directSaleCount > 0 ? 'font-medium' : 'text-muted-foreground'}>{directSaleCount}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-sm" title="Para recetas">
+                    <Beaker className="h-3.5 w-3.5 text-indigo-500" />
+                    <span className={recipeCount > 0 ? 'font-medium' : 'text-muted-foreground'}>{recipeCount}</span>
                   </div>
                 </div>
 

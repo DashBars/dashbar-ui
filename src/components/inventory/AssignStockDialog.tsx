@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -21,12 +21,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useEvents } from '@/hooks/useEvents';
 import { useBars } from '@/hooks/useBars';
+import { useEventRecipes } from '@/hooks/useRecipes';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { stockMovementsApi } from '@/lib/api/dashbar';
 import type { GlobalInventory, AssignStockDto } from '@/lib/api/types';
-import { Loader2, Package, Beaker, TrendingUp } from 'lucide-react';
+import { Loader2, Package, Beaker, TrendingUp, Info } from 'lucide-react';
 import { toast } from 'sonner';
-import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
 interface AssignStockDialogProps {
@@ -52,11 +52,43 @@ export function AssignStockDialog({
 
   const eventIdNum = selectedEventId ? parseInt(selectedEventId, 10) : 0;
   const { data: bars = [], isLoading: isLoadingBars } = useBars(eventIdNum);
+  const { data: eventRecipes = [] } = useEventRecipes(eventIdNum);
 
   const availableQuantity = inventory.totalQuantity - inventory.allocatedQuantity;
 
   // Costo unitario en pesos (convertido desde centavos)
   const unitCostInPesos = inventory.unitCost / 100;
+
+  // Find existing direct-sale recipe price for a drink name
+  const getExistingDirectSalePrice = useCallback(
+    (drinkName: string): number | null => {
+      const match = eventRecipes.find(
+        (r) =>
+          r.cocktailName.toLowerCase() === drinkName.toLowerCase() &&
+          r.components.length === 1 &&
+          r.components[0].percentage === 100 &&
+          r.salePrice > 0,
+      );
+      return match ? match.salePrice : null;
+    },
+    [eventRecipes],
+  );
+
+  // Detect existing price for the selected drink (direct-sale recipe)
+  const existingPriceCents = useMemo(() => {
+    if (!inventory.drink?.name || !sellAsWholeUnit || !eventIdNum) return null;
+    return getExistingDirectSalePrice(inventory.drink.name);
+  }, [inventory.drink?.name, sellAsWholeUnit, eventIdNum, getExistingDirectSalePrice]);
+
+  const hasExistingPrice = existingPriceCents !== null;
+  const isPriceLocked = hasExistingPrice;
+
+  // Auto-fill price when an existing recipe price is found
+  useEffect(() => {
+    if (hasExistingPrice && sellAsWholeUnit) {
+      setSalePrice((existingPriceCents! / 100).toString());
+    }
+  }, [hasExistingPrice, existingPriceCents, sellAsWholeUnit]);
 
   // Cálculo del margen de ganancia
   const profitMargin = useMemo(() => {
@@ -78,6 +110,7 @@ export function AssignStockDialog({
       queryClient.invalidateQueries({ queryKey: ['global-inventory'] });
       queryClient.invalidateQueries({ queryKey: ['bars'] });
       queryClient.invalidateQueries({ queryKey: ['stock'] });
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
       toast.success('Stock asignado correctamente');
       onOpenChange(false);
       resetForm();
@@ -297,6 +330,21 @@ export function AssignStockDialog({
                     <span className="font-medium">${unitCostInPesos.toFixed(2)}</span>
                   </div>
 
+                  {/* Existing price info banner */}
+                  {hasExistingPrice && (
+                    <div className="flex items-start gap-2 text-sm rounded-lg px-3 py-2 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                      <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                      <div>
+                        <span>
+                          Este producto ya tiene precio asignado: <strong>${(existingPriceCents! / 100).toFixed(2)}</strong>
+                        </span>
+                        <p className="text-xs mt-1 opacity-80">
+                          Para modificar el precio, editá la receta desde "Recetas y Productos".
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <Label htmlFor="salePrice">
                       Precio de venta ($) <span className="text-destructive">*</span>
@@ -307,8 +355,13 @@ export function AssignStockDialog({
                       min="0"
                       step="0.01"
                       value={salePrice}
-                      onChange={(e) => setSalePrice(e.target.value)}
-                      disabled={assignMutation.isPending}
+                      onChange={(e) => {
+                        if (!isPriceLocked) {
+                          setSalePrice(e.target.value);
+                        }
+                      }}
+                      disabled={assignMutation.isPending || isPriceLocked}
+                      className={isPriceLocked ? 'bg-muted cursor-not-allowed' : ''}
                       placeholder="Ej: 5.00"
                       required={sellAsWholeUnit}
                     />

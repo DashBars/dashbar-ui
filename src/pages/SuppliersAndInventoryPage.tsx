@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,9 +23,23 @@ import { GlobalInventoryMovementsDialog } from '@/components/inventory/GlobalInv
 import { AssignStockDialog } from '@/components/inventory/AssignStockDialog';
 import { useDrinks, useDeleteDrink } from '@/hooks/useDrinks';
 import type { Supplier, GlobalInventory, Drink } from '@/lib/api/types';
-import { Plus } from 'lucide-react';
+import { Plus, ArrowRight, Package } from 'lucide-react';
 
 export function SuppliersAndInventoryPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'suppliers');
+
+  // Sync tab from URL on mount
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['suppliers', 'inventory', 'global-stock'].includes(tabParam)) {
+      setActiveTab(tabParam);
+      // Clean up the param
+      searchParams.delete('tab');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   // Suppliers state
   const { data: suppliers = [], isLoading: isLoadingSuppliers } = useSuppliers();
   const { mutate: deleteSupplier } = useDeleteSupplier();
@@ -152,7 +167,7 @@ export function SuppliersAndInventoryPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="suppliers" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="suppliers">Proveedores</TabsTrigger>
           <TabsTrigger value="inventory">Insumos</TabsTrigger>
@@ -241,30 +256,42 @@ export function SuppliersAndInventoryPage() {
                 Registra las compras de insumos que has realizado
               </p>
             </div>
-            <Button onClick={handleAddStock} disabled={drinks.length === 0}>
-              <Plus className="mr-2 h-4 w-4" />
-              Agregar Stock
-            </Button>
+            {globalInventory.length > 0 && (
+              <Button onClick={handleAddStock}>
+                <Plus className="mr-2 h-4 w-4" />
+                Agregar Stock
+              </Button>
+            )}
           </div>
 
           {globalInventory.length === 0 && !isLoadingInventory ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <p className="text-lg font-medium text-muted-foreground mb-4">
+                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <Package className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-lg font-medium text-muted-foreground mb-2">
                   No hay stock en inventario global
                 </p>
                 <p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
                   Registra las compras de insumos que has realizado. Luego podrás
                   asignarlos a las barras de tus eventos.
                 </p>
-                <Button onClick={handleAddStock} disabled={drinks.length === 0}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Agregar tu primer stock
-                </Button>
-                {drinks.length === 0 && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Primero debes crear al menos un insumo
-                  </p>
+                {drinks.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <p className="text-sm text-muted-foreground text-center">
+                      Para agregar stock, primero necesitás crear al menos un insumo.
+                    </p>
+                    <Button onClick={() => setActiveTab('inventory')}>
+                      <ArrowRight className="mr-2 h-4 w-4" />
+                      Ir a crear insumos
+                    </Button>
+                  </div>
+                ) : (
+                  <Button onClick={handleAddStock}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Agregar tu primer stock
+                  </Button>
                 )}
               </CardContent>
             </Card>

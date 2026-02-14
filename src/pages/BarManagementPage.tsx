@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,8 +19,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Trash2, ArrowLeft, Wine, Monitor, Package, Info, ArrowRight } from 'lucide-react';
-import { useDeleteBar } from '@/hooks/useBars';
+import { Trash2, ArrowLeft, Wine, Monitor, Package, Info, ArrowRight, Pencil, Beaker, ShoppingBag, Power, PowerOff, AlertTriangle, Plus } from 'lucide-react';
+import { useDeleteBar, useUpdateBar } from '@/hooks/useBars';
+import { useEventRecipes } from '@/hooks/useRecipes';
+import { BarFormDialog } from '@/components/bars/BarFormDialog';
 
 const barTypeColors: Record<string, 'default' | 'secondary' | 'outline'> = {
   VIP: 'default',
@@ -50,10 +52,76 @@ export function BarManagementPage() {
   const { data: event, isLoading: isLoadingEvent } = useEvent(eventIdNum);
   const { data: bar, isLoading: isLoadingBar } = useBar(eventIdNum, barIdNum);
   const deleteBar = useDeleteBar(eventIdNum);
+  const updateBar = useUpdateBar(eventIdNum, barIdNum);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+
+  const isActive = event?.status === 'active';
+  const isBarOpen = bar?.status === 'open' || bar?.status === 'lowStock';
+
+  const { data: eventRecipes = [] } = useEventRecipes(eventIdNum);
 
   const isLoading = isLoadingEvent || isLoadingBar;
   const isFinished = event?.status === 'finished' || event?.status === 'archived';
+
+  // Compute recipe ingredient warnings for this bar's type
+  const recipeWarnings = useMemo(() => {
+    if (!bar || !eventRecipes.length) return [];
+    const warnings: Array<{ recipeName: string; missingDrinks: string[] }> = [];
+    const barStocks = bar.stocks || [];
+
+    for (const recipe of eventRecipes) {
+      const isDirectSale = recipe.components.length === 1 && recipe.components[0].percentage === 100;
+      if (isDirectSale) continue;
+      if (!recipe.barTypes.includes(bar.type as any)) continue;
+
+      const missingDrinks: string[] = [];
+      for (const comp of recipe.components) {
+        const drinkName = comp.drink?.name;
+        if (!drinkName) continue;
+        const hasIngredient = barStocks.some(
+          (s) => !s.sellAsWholeUnit && s.drinkId === comp.drinkId && s.quantity > 0,
+        );
+        if (!hasIngredient) {
+          missingDrinks.push(drinkName);
+        }
+      }
+      if (missingDrinks.length > 0) {
+        warnings.push({ recipeName: recipe.cocktailName, missingDrinks });
+      }
+    }
+    return warnings;
+  }, [bar, eventRecipes]);
+
+  // Stock overview computations
+  const stockOverview = useMemo(() => {
+    const stocks = bar?.stocks || [];
+    const directSale = stocks.filter((s) => s.sellAsWholeUnit);
+    const forRecipes = stocks.filter((s) => !s.sellAsWholeUnit);
+
+    // Compute unit counts (quantity is in ml, divide by drink volume)
+    const directSaleItems = directSale.map((s) => ({
+      name: s.drink?.name || 'Desconocido',
+      brand: s.drink?.brand || '',
+      units: s.drink?.volume ? Math.round(s.quantity / s.drink.volume) : 0,
+      salePrice: s.salePrice,
+    }));
+
+    const recipeItems = forRecipes.map((s) => ({
+      name: s.drink?.name || 'Desconocido',
+      brand: s.drink?.brand || '',
+      units: s.drink?.volume ? Math.round(s.quantity / s.drink.volume) : 0,
+      volumeMl: s.quantity,
+    }));
+
+    return {
+      totalItems: stocks.length,
+      directSaleCount: directSale.length,
+      recipeCount: forRecipes.length,
+      directSaleItems,
+      recipeItems,
+    };
+  }, [bar?.stocks]);
 
   // Mantener el estado sincronizado con la URL sin setState durante el render
   useEffect(() => {
@@ -119,17 +187,51 @@ export function BarManagementPage() {
             <Badge variant={statusColors[bar.status as BarStatus] || 'default'}>
               {bar.status}
             </Badge>
-            {event?.status === 'upcoming' && (
+            {isActive && (
               <Button
-                variant="destructive"
+                variant={isBarOpen ? 'outline' : 'default'}
                 size="sm"
                 className="gap-2"
-                onClick={() => setDeleteDialogOpen(true)}
-                disabled={deleteBar.isPending}
+                onClick={() =>
+                  updateBar.mutate({ status: isBarOpen ? 'closed' : 'open' })
+                }
+                disabled={updateBar.isPending}
               >
-                <Trash2 className="h-4 w-4" />
-                Eliminar barra
+                {isBarOpen ? (
+                  <>
+                    <PowerOff className="h-4 w-4" />
+                    Cerrar barra
+                  </>
+                ) : (
+                  <>
+                    <Power className="h-4 w-4" />
+                    Abrir barra
+                  </>
+                )}
               </Button>
+            )}
+            {event?.status === 'upcoming' && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => setEditDialogOpen(true)}
+                >
+                  <Pencil className="h-4 w-4" />
+                  Editar barra
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  disabled={deleteBar.isPending}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Eliminar barra
+                </Button>
+              </>
             )}
           </div>
         )}
@@ -225,49 +327,187 @@ export function BarManagementPage() {
                 <Skeleton className="h-28 rounded-2xl" />
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-3">
-                <Card className="rounded-2xl">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <div className="rounded-xl bg-primary/10 p-3">
-                        <Wine className="h-6 w-6 text-primary" />
+              <>
+                {/* Summary cards */}
+                <div className="grid gap-4 md:grid-cols-4">
+                  <Card className="rounded-2xl">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-xl bg-primary/10 p-2.5">
+                          <Wine className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Tipo</p>
+                          <p className="text-lg font-semibold capitalize">{bar?.type}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Tipo de barra</p>
-                        <p className="text-2xl font-semibold capitalize">{bar?.type}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
 
-                <Card className="rounded-2xl">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <div className="rounded-xl bg-blue-500/10 p-3">
-                        <Monitor className="h-6 w-6 text-blue-500" />
+                  <Card className="rounded-2xl">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-xl bg-blue-500/10 p-2.5">
+                          <Monitor className="h-5 w-5 text-blue-500" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Dispositivos POS</p>
+                          <p className="text-lg font-semibold">{bar?.posnets?.length || 0}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Dispositivos POS</p>
-                        <p className="text-2xl font-semibold">{bar?.posnets?.length || 0}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
 
-                <Card className="rounded-2xl">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <div className="rounded-xl bg-green-500/10 p-3">
-                        <Package className="h-6 w-6 text-green-500" />
+                  <Card className="rounded-2xl">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-xl bg-green-500/10 p-2.5">
+                          <ShoppingBag className="h-5 w-5 text-green-500" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Venta directa</p>
+                          <p className="text-lg font-semibold">{stockOverview.directSaleCount}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Insumos en stock</p>
-                        <p className="text-2xl font-semibold">{bar?.stocks?.length || 0}</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-2xl">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-xl bg-indigo-500/10 p-2.5">
+                          <Beaker className="h-5 w-5 text-indigo-500" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Para recetas</p>
+                          <p className="text-lg font-semibold">{stockOverview.recipeCount}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Recipe ingredient warnings – always shown */}
+                {recipeWarnings.length > 0 && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-amber-800">
+                          Recetas sin insumos suficientes
+                        </p>
+                        <ul className="text-xs text-amber-700 space-y-0.5">
+                          {recipeWarnings.map((w) => (
+                            <li key={w.recipeName}>
+                              <span className="font-medium">{w.recipeName}</span>
+                              {': faltan '}
+                              {w.missingDrinks.join(', ')}
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
+                  </div>
+                )}
+
+                {/* Stock detail lists */}
+                {stockOverview.totalItems === 0 ? (
+                  <Card className="rounded-2xl">
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <Package className="h-10 w-10 text-muted-foreground/50 mb-3" />
+                      <p className="text-sm font-medium text-muted-foreground">
+                        No hay stock cargado en esta barra
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 mb-4">
+                        Asigná stock desde el inventario global para empezar.
+                      </p>
+                      <Button
+                        variant="default"
+                        className="gap-2"
+                        onClick={() => setActiveTab('stock')}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Cargar stock a esta barra
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {/* Direct sale items */}
+                    <Card className="rounded-2xl">
+                      <CardContent className="p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <ShoppingBag className="h-4 w-4 text-green-600" />
+                          <h3 className="text-sm font-semibold">Venta directa</h3>
+                          <Badge variant="secondary" className="text-xs ml-auto">
+                            {stockOverview.directSaleCount}
+                          </Badge>
+                        </div>
+                        {stockOverview.directSaleItems.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2">Sin productos de venta directa</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {stockOverview.directSaleItems.map((item, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center justify-between text-sm rounded-lg bg-muted/40 px-3 py-2"
+                              >
+                                <div>
+                                  <p className="font-medium text-sm">{item.name}</p>
+                                  {item.brand && (
+                                    <p className="text-xs text-muted-foreground">{item.brand}</p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xs font-medium">{item.units} u.</p>
+                                  {item.salePrice != null && item.salePrice > 0 && (
+                                    <p className="text-xs text-green-600 font-medium">
+                                      ${(item.salePrice / 100).toFixed(2)}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Recipe ingredients */}
+                    <Card className="rounded-2xl">
+                      <CardContent className="p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Beaker className="h-4 w-4 text-indigo-600" />
+                          <h3 className="text-sm font-semibold">Para recetas</h3>
+                          <Badge variant="secondary" className="text-xs ml-auto">
+                            {stockOverview.recipeCount}
+                          </Badge>
+                        </div>
+                        {stockOverview.recipeItems.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2">Sin insumos para recetas</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {stockOverview.recipeItems.map((item, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center justify-between text-sm rounded-lg bg-muted/40 px-3 py-2"
+                              >
+                                <div>
+                                  <p className="font-medium text-sm">{item.name}</p>
+                                  {item.brand && (
+                                    <p className="text-xs text-muted-foreground">{item.brand}</p>
+                                  )}
+                                </div>
+                                <p className="text-xs font-medium">{item.units} u.</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+              </>
             )}
           </TabsContent>
 
@@ -288,6 +528,15 @@ export function BarManagementPage() {
             />
           </TabsContent>
         </Tabs>
+      )}
+
+      {bar && (
+        <BarFormDialog
+          eventId={eventIdNum}
+          bar={bar}
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+        />
       )}
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
