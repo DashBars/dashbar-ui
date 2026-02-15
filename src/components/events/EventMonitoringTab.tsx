@@ -15,6 +15,9 @@ import {
   ChevronDown,
   ChevronUp,
   List,
+  ArrowRightLeft,
+  Wine,
+  Boxes,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,11 +27,13 @@ import { Button } from '@/components/ui/button';
 import { useBars } from '@/hooks/useBars';
 import { useEventPosnets } from '@/hooks/usePosnets';
 import { useEventDashboard } from '@/hooks/useEventDashboard';
-import type { Bar, Posnet, PosnetStatus } from '@/lib/api/types';
+import { useAlerts, useThresholds } from '@/hooks/useAlarms';
+import type { Bar, Posnet, PosnetStatus, StockAlert, StockThreshold } from '@/lib/api/types';
 import type { RecentSale, LiveAlert, PosLiveMetrics } from '@/hooks/useEventDashboard';
 
 interface EventMonitoringTabProps {
   eventId: number;
+  onNavigateToAlarms?: () => void;
 }
 
 // ── Helpers ──
@@ -127,17 +132,6 @@ function LiveSalesFeed({ sales, bars }: { sales: RecentSale[]; bars: Bar[] }) {
     return map;
   }, [bars]);
 
-  // Stable color per bar
-  const barColorMap = useMemo(() => {
-    const colors = [
-      'bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500',
-      'bg-rose-500', 'bg-cyan-500', 'bg-orange-500', 'bg-pink-500',
-    ];
-    const map = new Map<number, string>();
-    bars.forEach((b, i) => map.set(b.id, colors[i % colors.length]));
-    return map;
-  }, [bars]);
-
   if (sales.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
@@ -154,7 +148,11 @@ function LiveSalesFeed({ sales, bars }: { sales: RecentSale[]; bars: Bar[] }) {
           key={`${sale.id}-${idx}`}
           className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-muted/50 transition-colors animate-in slide-in-from-top-2 duration-300"
         >
-          <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${barColorMap.get(sale.barId) || 'bg-gray-400'}`} />
+          {sale.isDirectSale ? (
+            <Package className="h-3.5 w-3.5 text-green-600 shrink-0" />
+          ) : (
+            <Wine className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+          )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{sale.cocktailName}</p>
             <p className="text-xs text-muted-foreground">
@@ -171,22 +169,27 @@ function LiveSalesFeed({ sales, bars }: { sales: RecentSale[]; bars: Bar[] }) {
   );
 }
 
-function SalesTable({ sales, bars }: { sales: RecentSale[]; bars: Bar[] }) {
-  const [isExpanded, setIsExpanded] = useState(true);
+function SaleTypeBadge({ isDirectSale }: { isDirectSale?: boolean }) {
+  if (isDirectSale) {
+    return (
+      <Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 text-[10px] gap-0.5">
+        <Package className="h-3 w-3" />
+        Directa
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 text-[10px] gap-0.5">
+      <Wine className="h-3 w-3" />
+      Coctel
+    </Badge>
+  );
+}
 
+function SalesTable({ sales, bars }: { sales: RecentSale[]; bars: Bar[] }) {
   const barNameMap = useMemo(() => {
     const map = new Map<number, string>();
     bars.forEach((b) => map.set(b.id, b.name));
-    return map;
-  }, [bars]);
-
-  const barColorMap = useMemo(() => {
-    const colors = [
-      'bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500',
-      'bg-rose-500', 'bg-cyan-500', 'bg-orange-500', 'bg-pink-500',
-    ];
-    const map = new Map<number, string>();
-    bars.forEach((b, i) => map.set(b.id, colors[i % colors.length]));
     return map;
   }, [bars]);
 
@@ -201,73 +204,228 @@ function SalesTable({ sales, bars }: { sales: RecentSale[]; bars: Bar[] }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs text-muted-foreground">
-          Mostrando {sales.length} venta{sales.length !== 1 ? 's' : ''} reciente{sales.length !== 1 ? 's' : ''}
-        </p>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1 text-xs"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          {isExpanded ? (
-            <>
-              <ChevronUp className="h-3.5 w-3.5" />
-              Colapsar
-            </>
-          ) : (
-            <>
-              <ChevronDown className="h-3.5 w-3.5" />
-              Expandir
-            </>
-          )}
-        </Button>
-      </div>
-      {isExpanded && (
-        <div className="rounded-md border max-h-[400px] overflow-y-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[40%]">Producto</TableHead>
-                <TableHead>Barra</TableHead>
-                <TableHead className="text-center">Cant.</TableHead>
-                <TableHead className="text-right">Monto</TableHead>
-                <TableHead className="text-right">Hora</TableHead>
+      <p className="text-xs text-muted-foreground mb-2">
+        Mostrando {sales.length} venta{sales.length !== 1 ? 's' : ''} reciente{sales.length !== 1 ? 's' : ''}
+      </p>
+      <div className="rounded-md border max-h-[400px] overflow-y-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[30%]">Producto</TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead>Barra</TableHead>
+              <TableHead className="text-center">Cant.</TableHead>
+              <TableHead className="text-right">Monto</TableHead>
+              <TableHead className="text-right">Hora</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sales.map((sale, idx) => (
+              <TableRow
+                key={`${sale.id}-${idx}`}
+                className="animate-in slide-in-from-top-1 duration-200"
+              >
+                <TableCell className="font-medium">
+                  {sale.cocktailName}
+                </TableCell>
+                <TableCell>
+                  <SaleTypeBadge isDirectSale={sale.isDirectSale} />
+                </TableCell>
+                <TableCell className="text-muted-foreground text-sm">
+                  {sale.barName || barNameMap.get(sale.barId) || 'Barra'}
+                </TableCell>
+                <TableCell className="text-center">
+                  <Badge variant="secondary" className="text-xs">
+                    x{sale.quantity}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right font-semibold">
+                  {formatCurrency(sale.totalAmount)}
+                </TableCell>
+                <TableCell className="text-right text-xs text-muted-foreground">
+                  {new Date(sale.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sales.map((sale, idx) => (
-                <TableRow
-                  key={`${sale.id}-${idx}`}
-                  className="animate-in slide-in-from-top-1 duration-200"
-                >
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full shrink-0 ${barColorMap.get(sale.barId) || 'bg-gray-400'}`} />
-                      {sale.cocktailName}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {sale.barName || barNameMap.get(sale.barId) || 'Barra'}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="secondary" className="text-xs">
-                      x{sale.quantity}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {formatCurrency(sale.totalAmount)}
-                  </TableCell>
-                  <TableCell className="text-right text-xs text-muted-foreground">
-                    {new Date(sale.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+// ── Collapsible Sales Card ──
+
+function CollapsibleSalesCard({ sales, bars }: { sales: RecentSale[]; bars: Bar[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <Card className="rounded-2xl">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between px-6 py-4 text-left hover:bg-muted/30 transition-colors rounded-2xl"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="flex items-center gap-2 text-base font-semibold">
+          <List className="h-4 w-4" />
+          Registro de ventas en tiempo real
+          {sales.length > 0 && (
+            <Badge variant="secondary" className="text-[10px] ml-1">
+              {sales.length}
+            </Badge>
+          )}
         </div>
+        <div className="flex items-center gap-2">
+          {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </div>
+      </button>
+      {isOpen && (
+        <CardContent className="pt-0">
+          <SalesTable sales={sales} bars={bars} />
+        </CardContent>
       )}
+    </Card>
+  );
+}
+
+// ── Stock Overview Table ──
+
+interface StockRow {
+  drinkId: number;
+  drinkName: string;
+  drinkBrand: string;
+  drinkVolume: number;
+  sellAsWholeUnit: boolean;
+  totalMl: number;
+  units: number;
+  threshold: number | null;
+}
+
+function StockOverviewTable({ bars, thresholds }: { bars: Bar[]; thresholds: StockThreshold[] }) {
+  // Build threshold lookup: `drinkId-sellAsWholeUnit` -> lowerThreshold
+  const thresholdMap = useMemo(() => {
+    const map = new Map<string, number>();
+    thresholds.forEach((t) => {
+      map.set(`${t.drinkId}-${t.sellAsWholeUnit}`, t.lowerThreshold);
+    });
+    return map;
+  }, [thresholds]);
+
+  // Aggregate stock across all bars by drinkId + sellAsWholeUnit
+  const rows = useMemo(() => {
+    const agg = new Map<string, StockRow>();
+
+    bars.forEach((bar) => {
+      (bar.stocks || []).forEach((s: any) => {
+        const key = `${s.drinkId}-${s.sellAsWholeUnit}`;
+        const existing = agg.get(key);
+        const drinkVol = s.drink?.volume ?? 1;
+        if (existing) {
+          existing.totalMl += s.quantity;
+          existing.units = Math.floor(existing.totalMl / drinkVol);
+        } else {
+          agg.set(key, {
+            drinkId: s.drinkId,
+            drinkName: s.drink?.name ?? `Drink #${s.drinkId}`,
+            drinkBrand: s.drink?.brand ?? '',
+            drinkVolume: drinkVol,
+            sellAsWholeUnit: s.sellAsWholeUnit ?? false,
+            totalMl: s.quantity,
+            units: Math.floor(s.quantity / drinkVol),
+            threshold: thresholdMap.get(key) ?? null,
+          });
+        }
+      });
+    });
+
+    // Update thresholds after aggregation
+    for (const [key, row] of agg.entries()) {
+      row.threshold = thresholdMap.get(key) ?? null;
+    }
+
+    return Array.from(agg.values()).sort((a, b) => a.drinkName.localeCompare(b.drinkName));
+  }, [bars, thresholdMap]);
+
+  if (rows.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+        <Boxes className="h-8 w-8 mb-2 opacity-40" />
+        <p className="text-sm">Sin datos de stock</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border max-h-[400px] overflow-y-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Insumo</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead className="text-right">Stock (un.)</TableHead>
+            <TableHead className="text-right">Umbral (un.)</TableHead>
+            <TableHead className="text-center">Estado</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => {
+            let statusBadge: React.ReactNode;
+            if (row.threshold == null) {
+              statusBadge = <Badge variant="secondary" className="text-[10px]">Sin umbral</Badge>;
+            } else if (row.units <= row.threshold) {
+              statusBadge = <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 text-[10px]">Critico</Badge>;
+            } else if (row.units <= row.threshold * 1.5) {
+              statusBadge = <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 text-[10px]">Bajo</Badge>;
+            } else {
+              statusBadge = <Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 text-[10px]">OK</Badge>;
+            }
+
+            return (
+              <TableRow
+                key={`${row.drinkId}-${row.sellAsWholeUnit}`}
+                className={
+                  row.threshold != null && row.units <= row.threshold
+                    ? 'bg-red-50/50 dark:bg-red-950/10'
+                    : row.threshold != null && row.units <= row.threshold * 1.5
+                      ? 'bg-amber-50/50 dark:bg-amber-950/10'
+                      : ''
+                }
+              >
+                <TableCell>
+                  <div>
+                    <p className="font-medium text-sm">{row.drinkName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {row.drinkBrand} &middot; {row.drinkVolume} ml
+                    </p>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {row.sellAsWholeUnit ? (
+                    <Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 text-[10px] gap-0.5">
+                      <Package className="h-3 w-3" />
+                      Directa
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 text-[10px] gap-0.5">
+                      <Wine className="h-3 w-3" />
+                      Recetas
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {row.units}
+                </TableCell>
+                <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                  {row.threshold != null ? row.threshold : '—'}
+                </TableCell>
+                <TableCell className="text-center">
+                  {statusBadge}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -414,7 +572,24 @@ function PosStatusGrid({
   );
 }
 
-function AlertsFeed({ alerts }: { alerts: LiveAlert[] }) {
+function AlertsFeed({
+  alerts,
+  fullAlerts,
+  onViewAll,
+}: {
+  alerts: LiveAlert[];
+  fullAlerts: StockAlert[];
+  onViewAll?: () => void;
+}) {
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  // Merge donor info from fullAlerts into matching LiveAlerts
+  const donorsMap = useMemo(() => {
+    const map = new Map<number, StockAlert>();
+    fullAlerts.forEach((a) => map.set(a.id, a));
+    return map;
+  }, [fullAlerts]);
+
   if (alerts.length === 0) {
     return (
       <div className="flex items-center gap-2 py-4 text-muted-foreground justify-center">
@@ -425,30 +600,96 @@ function AlertsFeed({ alerts }: { alerts: LiveAlert[] }) {
   }
 
   return (
-    <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-      {alerts.map((alert, idx) => (
-        <div
-          key={`${alert.id}-${idx}`}
-          className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 px-3 py-2 animate-in slide-in-from-top-2 duration-300"
-        >
-          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">{alert.message}</p>
-            <p className="text-xs text-muted-foreground">
-              {alert.barName} &middot; {alert.drinkName} &middot; {timeAgo(alert.createdAt)}
-            </p>
+    <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+      {alerts.map((alert, idx) => {
+        const full = donorsMap.get(alert.id);
+        const hasDonors =
+          full?.suggestedDonors && full.suggestedDonors.length > 0;
+        const isExpanded = expandedId === alert.id;
+
+        return (
+          <div
+            key={`${alert.id}-${idx}`}
+            className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 animate-in slide-in-from-top-2 duration-300"
+          >
+            <div className="flex items-start gap-3 px-3 py-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">{alert.message}</p>
+                <p className="text-xs text-muted-foreground">
+                  {alert.barName} &middot; {alert.drinkName} &middot;{' '}
+                  {timeAgo(alert.createdAt)}
+                </p>
+              </div>
+              {hasDonors && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 shrink-0"
+                  onClick={() =>
+                    setExpandedId(isExpanded ? null : alert.id)
+                  }
+                >
+                  {isExpanded ? (
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              )}
+            </div>
+            {isExpanded && full?.suggestedDonors && (
+              <div className="px-3 pb-2 border-t border-amber-200 dark:border-amber-800 pt-2 space-y-1">
+                <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                  Barras con excedente:
+                </p>
+                {full.suggestedDonors.map((d) => (
+                  <div
+                    key={d.barId}
+                    className="flex items-center gap-2 text-xs"
+                  >
+                    <ArrowRightLeft className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span className="font-medium">{d.barName}</span>
+                    <span className="text-muted-foreground">
+                      &middot; Excedente: {d.availableSurplus} un.
+                      &middot; Sugerido: {d.suggestedQuantity} un.
+                    </span>
+                  </div>
+                ))}
+                {full.externalNeeded && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1 mt-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Se necesita stock externo
+                  </p>
+                )}
+              </div>
+            )}
           </div>
+        );
+      })}
+      {onViewAll && (
+        <div className="text-center pt-1">
+          <Button
+            variant="link"
+            size="sm"
+            className="text-xs h-auto p-0"
+            onClick={onViewAll}
+          >
+            Ver todas las alarmas
+          </Button>
         </div>
-      ))}
+      )}
     </div>
   );
 }
 
 // ── Main Component ──
 
-export function EventMonitoringTab({ eventId }: EventMonitoringTabProps) {
+export function EventMonitoringTab({ eventId, onNavigateToAlarms }: EventMonitoringTabProps) {
   const { data: bars = [], isLoading: barsLoading } = useBars(eventId);
   const { data: posnets = [], isLoading: posnetsLoading } = useEventPosnets(eventId);
+  const { data: fullAlerts = [] } = useAlerts(eventId);
+  const { data: thresholds = [] } = useThresholds(eventId);
 
   const {
     totals,
@@ -485,7 +726,7 @@ export function EventMonitoringTab({ eventId }: EventMonitoringTabProps) {
         )}
         <span className="text-xs text-muted-foreground ml-auto">
           <Clock className="h-3 w-3 inline mr-1" />
-          Actualización automática cada 60s
+          Actualización automática cada 10s
         </span>
       </div>
 
@@ -521,25 +762,31 @@ export function EventMonitoringTab({ eventId }: EventMonitoringTabProps) {
         />
       </div>
 
-      {/* Row 2: Sales Table (full width, collapsible) */}
+      {/* Row 2: Stock overview (event-level) */}
       <Card className="rounded-2xl">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <List className="h-4 w-4" />
-            Registro de ventas
-            {recentSales.length > 0 && (
-              <Badge variant="secondary" className="text-[10px] ml-auto">
-                {recentSales.length}
-              </Badge>
-            )}
+            <Boxes className="h-4 w-4" />
+            Stock en tiempo real
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <SalesTable sales={recentSales} bars={bars} />
+          {barsLoading ? (
+            <div className="space-y-2">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full rounded" />
+              ))}
+            </div>
+          ) : (
+            <StockOverviewTable bars={bars} thresholds={thresholds} />
+          )}
         </CardContent>
       </Card>
 
-      {/* Row 3: Top Products */}
+      {/* Row 3: Sales Table (full width, collapsible card) */}
+      <CollapsibleSalesCard sales={recentSales} bars={bars} />
+
+      {/* Row 4: Top Products */}
       <Card className="rounded-2xl">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -560,7 +807,7 @@ export function EventMonitoringTab({ eventId }: EventMonitoringTabProps) {
         </CardContent>
       </Card>
 
-      {/* Row 4: Bar Status + POS Status */}
+      {/* Row 5: Bar Status + POS Status */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="rounded-2xl">
           <CardHeader className="pb-3">
@@ -609,7 +856,7 @@ export function EventMonitoringTab({ eventId }: EventMonitoringTabProps) {
         </Card>
       </div>
 
-      {/* Row 5: Alerts */}
+      {/* Row 6: Alerts */}
       <Card className="rounded-2xl">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -626,7 +873,7 @@ export function EventMonitoringTab({ eventId }: EventMonitoringTabProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <AlertsFeed alerts={alerts} />
+          <AlertsFeed alerts={alerts} fullAlerts={fullAlerts} onViewAll={onNavigateToAlarms} />
         </CardContent>
       </Card>
     </div>

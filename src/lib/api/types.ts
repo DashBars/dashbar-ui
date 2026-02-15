@@ -291,15 +291,18 @@ export interface POSSale {
   completedAt?: string;
   items: POSSaleItem[];
   payments: POSPayment[];
+  posnet?: { id: number; code: string; name: string };
+  bar?: { id: number; name: string; type: string };
 }
 
 export interface POSSaleItem {
   id: number;
   saleId: number;
-  productId: number;
-  productName: string;
+  productId?: number | null;
+  cocktailId?: number | null;
+  productNameSnapshot: string;
+  unitPriceSnapshot: number;
   quantity: number;
-  unitPrice: number;
   lineTotal: number;
 }
 
@@ -1081,6 +1084,7 @@ export interface WsSaleCreatedPayload {
     cocktailName: string;
     quantity: number;
     totalAmount: number;
+    isDirectSale: boolean;
     createdAt: string;
   };
 }
@@ -1136,4 +1140,61 @@ export interface WsAlertPayload {
   type: string;
   message: string;
   createdAt: string;
+}
+
+// ── Alarms / Stock Thresholds ──
+
+export interface StockThreshold {
+  id: number;
+  eventId: number;
+  drinkId: number;
+  sellAsWholeUnit: boolean;     // true = venta directa, false = recetas
+  lowerThreshold: number;       // in units (bottles/cans)
+  donationThreshold: number;    // in units – surplus level for donations
+  depletionHorizonMin?: number; // minutes for projected depletion
+  drink?: Drink;
+}
+
+export interface CreateThresholdDto {
+  drinkId: number;
+  sellAsWholeUnit: boolean;
+  lowerThreshold: number;
+  donationThreshold: number;
+  depletionHorizonMin?: number;
+}
+
+export interface UpdateThresholdDto {
+  lowerThreshold?: number;
+  donationThreshold?: number;
+  depletionHorizonMin?: number;
+}
+
+export interface DonorSuggestion {
+  barId: number;
+  barName: string;
+  availableSurplus: number;
+  suggestedQuantity: number;
+}
+
+export type AlertType = 'low_stock' | 'projected_depletion';
+export type AlertStatus = 'active' | 'acknowledged' | 'resolved' | 'expired';
+
+export interface StockAlert {
+  id: number;
+  eventId: number;
+  barId: number;
+  drinkId: number;
+  sellAsWholeUnit: boolean;
+  type: AlertType;
+  status: AlertStatus;
+  currentStock: number;
+  threshold: number;
+  suggestedDonors?: DonorSuggestion[];
+  externalNeeded: boolean;
+  projectedMinutes?: number;
+  message?: string;
+  createdAt: string;
+  resolvedAt?: string;
+  bar?: { id: number; name: string };
+  drink?: Drink;
 }

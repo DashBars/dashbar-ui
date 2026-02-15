@@ -726,6 +726,43 @@ export const stockMovementsApi = {
   },
 };
 
+// Transfers API (bar-to-bar stock redistribution)
+export const transfersApi = {
+  create: async (eventId: number, dto: {
+    donorBarId: number;
+    receiverBarId: number;
+    drinkId: number;
+    quantity: number;
+    alertId?: number;
+    notes?: string;
+  }) => {
+    const response = await api.post(`/events/${eventId}/transfers`, dto);
+    return response.data;
+  },
+  approve: async (eventId: number, transferId: number) => {
+    const response = await api.patch(`/events/${eventId}/transfers/${transferId}/approve`);
+    return response.data;
+  },
+  complete: async (eventId: number, transferId: number) => {
+    const response = await api.patch(`/events/${eventId}/transfers/${transferId}/complete`);
+    return response.data;
+  },
+  /** Convenience: create → approve → complete in one go */
+  createAndComplete: async (eventId: number, dto: {
+    donorBarId: number;
+    receiverBarId: number;
+    drinkId: number;
+    quantity: number;
+    alertId?: number;
+    notes?: string;
+  }) => {
+    const transfer = await transfersApi.create(eventId, dto);
+    const approved = await transfersApi.approve(eventId, transfer.id);
+    const completed = await transfersApi.complete(eventId, approved.id);
+    return completed;
+  },
+};
+
 // Venues API
 export const venuesApi = {
   getVenues: async (): Promise<Venue[]> => {
@@ -999,6 +1036,90 @@ export const reportsApi = {
   },
 };
 
+// ── Alarms / Thresholds API ──
+
+import type {
+  StockThreshold,
+  CreateThresholdDto,
+  UpdateThresholdDto,
+  StockAlert,
+  AlertStatus as AlertStatusType,
+} from './types';
+
+export const alarmsApi = {
+  // ── Thresholds ──
+  getThresholds: async (eventId: number): Promise<StockThreshold[]> => {
+    const response = await api.get<StockThreshold[]>(
+      `/events/${eventId}/thresholds`,
+    );
+    return response.data;
+  },
+
+  createThreshold: async (
+    eventId: number,
+    dto: CreateThresholdDto,
+  ): Promise<StockThreshold> => {
+    const response = await api.post<StockThreshold>(
+      `/events/${eventId}/thresholds`,
+      dto,
+    );
+    return response.data;
+  },
+
+  updateThreshold: async (
+    eventId: number,
+    drinkId: number,
+    sellAsWholeUnit: boolean,
+    dto: UpdateThresholdDto,
+  ): Promise<StockThreshold> => {
+    const response = await api.put<StockThreshold>(
+      `/events/${eventId}/thresholds/${drinkId}`,
+      dto,
+      { params: { sellAsWholeUnit } },
+    );
+    return response.data;
+  },
+
+  deleteThreshold: async (
+    eventId: number,
+    drinkId: number,
+    sellAsWholeUnit: boolean,
+  ): Promise<void> => {
+    await api.delete(`/events/${eventId}/thresholds/${drinkId}`, {
+      params: { sellAsWholeUnit },
+    });
+  },
+
+  // ── Alerts ──
+  getAlerts: async (
+    eventId: number,
+    status?: AlertStatusType,
+  ): Promise<StockAlert[]> => {
+    const response = await api.get<StockAlert[]>(
+      `/events/${eventId}/alerts`,
+      { params: status ? { status } : undefined },
+    );
+    return response.data;
+  },
+
+  acknowledgeAlert: async (
+    eventId: number,
+    alertId: number,
+  ): Promise<StockAlert> => {
+    const response = await api.patch<StockAlert>(
+      `/events/${eventId}/alerts/${alertId}/acknowledge`,
+    );
+    return response.data;
+  },
+
+  forceCheck: async (eventId: number): Promise<StockAlert[]> => {
+    const response = await api.post<StockAlert[]>(
+      `/events/${eventId}/alerts/check`,
+    );
+    return response.data;
+  },
+};
+
 // ── Dashboard / Monitoring API ──
 
 export const dashboardApi = {
@@ -1030,6 +1151,87 @@ export const dashboardApi = {
     const response = await api.get<TopProductsResponse>(
       `/events/${eventId}/dashboard/top-products`,
       { params: { limit } },
+    );
+    return response.data;
+  },
+};
+
+// ── Event Sales API ──
+
+export interface EventSalesPage {
+  sales: POSSale[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export const eventSalesApi = {
+  /** Get paginated sales for an event */
+  getSales: async (eventId: number, page: number = 1, limit: number = 20): Promise<EventSalesPage> => {
+    const response = await api.get<EventSalesPage>(
+      `/events/${eventId}/sales`,
+      { params: { page, limit } },
+    );
+    return response.data;
+  },
+};
+
+// ── Demo API ──
+
+export interface DemoSetupResponse {
+  event: Event;
+  posnetIds: number[];
+  cocktailIds: number[];
+  message: string;
+}
+
+export interface DemoSimulationResponse {
+  message: string;
+  running?: boolean;
+  totalSales?: number;
+  intervalMs?: number;
+  posnetCount?: number;
+  cocktailCount?: number;
+}
+
+export interface DemoStatusResponse {
+  running: boolean;
+  salesCount: number;
+  consecutiveErrors?: number;
+}
+
+export const demoApi = {
+  /** Create a fully configured demo event */
+  setup: async (): Promise<DemoSetupResponse> => {
+    const response = await api.post<DemoSetupResponse>('/demo/setup');
+    return response.data;
+  },
+
+  /** Start simulation on a demo event */
+  startSimulation: async (
+    eventId: number,
+    intervalMs?: number,
+  ): Promise<DemoSimulationResponse> => {
+    const response = await api.post<DemoSimulationResponse>(
+      `/demo/${eventId}/simulate/start`,
+      intervalMs ? { intervalMs } : {},
+    );
+    return response.data;
+  },
+
+  /** Stop simulation on a demo event */
+  stopSimulation: async (eventId: number): Promise<DemoSimulationResponse> => {
+    const response = await api.post<DemoSimulationResponse>(
+      `/demo/${eventId}/simulate/stop`,
+    );
+    return response.data;
+  },
+
+  /** Get simulation status */
+  getStatus: async (eventId: number): Promise<DemoStatusResponse> => {
+    const response = await api.get<DemoStatusResponse>(
+      `/demo/${eventId}/simulate/status`,
     );
     return response.data;
   },

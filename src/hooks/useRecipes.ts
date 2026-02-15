@@ -14,6 +14,7 @@ export function useEventRecipes(eventId: number) {
     queryKey: recipesKeys.list(eventId),
     queryFn: () => recipesApi.getRecipes(eventId),
     enabled: !!eventId,
+    refetchInterval: 10_000,
   });
 }
 

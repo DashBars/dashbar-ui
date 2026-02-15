@@ -36,15 +36,26 @@ import {
 } from 'lucide-react';
 import { useBars } from '@/hooks/useBars';
 import { useQueries } from '@tanstack/react-query';
-import { stockApi, stockMovementsApi } from '@/lib/api/dashbar';
+import { stockApi, stockMovementsApi, inventoryMovementsApi } from '@/lib/api/dashbar';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { stockKeys } from '@/hooks/useStock';
-import type { Stock, BulkReturnStockDto, BulkReturnResult, BulkReturnMode, BulkDiscardStockDto, BulkDiscardResult } from '@/lib/api/types';
+import type { Stock, BulkReturnStockDto, BulkReturnResult, BulkReturnMode, BulkDiscardStockDto, BulkDiscardResult, InventoryMovement } from '@/lib/api/types';
 import { toast } from 'sonner';
 
 interface BarPostEventOverviewProps {
   eventId: number;
   barId?: number; // Optional: if provided, show only this bar's stock
+}
+
+interface ConsumptionEntry {
+  drinkId: number;
+  drinkName: string;
+  drinkBrand: string;
+  drinkVolume: number;
+  supplierId: number;
+  supplierName: string;
+  sellAsWholeUnit: boolean;
+  totalConsumedMl: number;
 }
 
 interface StockWithBar extends Stock {
@@ -344,7 +355,17 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
     })),
   });
 
+  // Fetch inventory movements for all target bars (for consumption data)
+  const movementQueries = useQueries({
+    queries: targetBars.map((bar) => ({
+      queryKey: ['inventory-movements', eventId, bar.id],
+      queryFn: () => inventoryMovementsApi.findAll(eventId, bar.id),
+      enabled: !!eventId && !!bar.id,
+    })),
+  });
+
   const isLoadingStock = stockQueries.some((q) => q.isLoading);
+  const isLoadingMovements = movementQueries.some((q) => q.isLoading);
   const isLoading = isLoadingBars || isLoadingStock;
 
   // Merge all stock with bar names
@@ -380,6 +401,48 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
     }
     return { returnableStock: returnable, partialStock: partial, consumedStock: consumed };
   }, [allStock]);
+
+  // Compute consumption data from inventory movements (sale decrements)
+  const consumptionData: ConsumptionEntry[] = useMemo(() => {
+    if (isLoadingMovements) return [];
+    const map = new Map<string, ConsumptionEntry>();
+
+    // Build drink/supplier info from stock data
+    const drinkInfo = new Map<number, { name: string; brand: string; volume: number }>();
+    const supplierInfo = new Map<number, string>();
+    for (const s of allStock) {
+      if (s.drink) drinkInfo.set(s.drinkId, { name: s.drink.name, brand: s.drink.brand || '', volume: s.drink.volume || 0 });
+      if (s.supplier) supplierInfo.set(s.supplierId, s.supplier.name);
+    }
+
+    for (const query of movementQueries) {
+      if (!query.data) continue;
+      for (const m of query.data as InventoryMovement[]) {
+        // Only count sale decrements (negative quantity movements from sales)
+        if (m.quantity >= 0) continue;
+        if (m.reason !== 'SALE_DECREMENT') continue;
+
+        const key = `${m.drinkId}-${m.supplierId}-${m.sellAsWholeUnit ?? false}`;
+        const existing = map.get(key);
+        if (existing) {
+          existing.totalConsumedMl += Math.abs(m.quantity);
+        } else {
+          const drink = drinkInfo.get(m.drinkId);
+          map.set(key, {
+            drinkId: m.drinkId,
+            drinkName: drink?.name || 'Insumo',
+            drinkBrand: drink?.brand || '',
+            drinkVolume: drink?.volume || 0,
+            supplierId: m.supplierId,
+            supplierName: supplierInfo.get(m.supplierId) || 'Proveedor',
+            sellAsWholeUnit: m.sellAsWholeUnit ?? false,
+            totalConsumedMl: Math.abs(m.quantity),
+          });
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.totalConsumedMl - a.totalConsumedMl);
+  }, [movementQueries, allStock, isLoadingMovements]);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -552,12 +615,12 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
     return (
       <div className="space-y-4">
         <Card className="rounded-2xl">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
-            <p className="text-lg font-medium">Todo el stock fue devuelto o consumido</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              No queda stock pendiente de devolución
-            </p>
+          <CardContent className="flex items-center gap-3 py-4 px-5">
+            <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+            <div>
+              <p className="text-sm font-medium">Todo el stock fue devuelto o consumido</p>
+              <p className="text-xs text-muted-foreground">No queda stock pendiente de devolución</p>
+            </div>
           </CardContent>
         </Card>
 
@@ -575,43 +638,41 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
           />
         )}
 
-        {/* Show consumed items as informational */}
-        {consumedStock.length > 0 && (
+        {/* Show consumed items from inventory movements */}
+        {consumptionData.length > 0 && (
           <Card className="rounded-2xl">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-3">
                 <div className="rounded-lg bg-purple-500/10 p-1.5">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-purple-600" />
+                  <Zap className="h-3.5 w-3.5 text-purple-600" />
                 </div>
                 <p className="text-sm font-medium">
-                  {consumedStock.length} {consumedStock.length === 1 ? 'insumo utilizado' : 'insumos utilizados'} durante el evento
+                  {consumptionData.length} {consumptionData.length === 1 ? 'insumo consumido' : 'insumos consumidos'} durante el evento
                 </p>
               </div>
               <div className="space-y-1.5">
-                {consumedStock.map((item) => {
-                  const drinkVol = item.drink?.volume || 0;
-                  const units = drinkVol > 0 ? Math.floor(Math.abs(item.quantity) / drinkVol) : 0;
+                {consumptionData.map((item) => {
+                  const units = item.drinkVolume > 0 ? (item.totalConsumedMl / item.drinkVolume) : 0;
+                  const displayUnits = units % 1 === 0 ? units.toString() : units.toFixed(1);
                   return (
                     <div
-                      key={stockKey(item)}
+                      key={`${item.drinkId}-${item.supplierId}-${item.sellAsWholeUnit}`}
                       className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-muted/40"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{item.drink?.name || 'Insumo'}</span>
-                        {item.drink?.brand && (
-                          <span className="text-xs text-muted-foreground">({item.drink.brand})</span>
+                        <span className="font-medium">{item.drinkName}</span>
+                        {item.drinkBrand && (
+                          <span className="text-xs text-muted-foreground">({item.drinkBrand})</span>
                         )}
-                        {item.supplier?.name && (
-                          <span className="text-xs text-muted-foreground">- {item.supplier.name}</span>
-                        )}
+                        <span className="text-xs text-muted-foreground">- {item.supplierName}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">
-                          {drinkVol > 0
-                            ? `${units} ${units === 1 ? 'unidad' : 'unidades'} (${drinkVol} ml c/u)`
-                            : '0 unidades'}
+                          {item.drinkVolume > 0
+                            ? `${displayUnits} ${units === 1 ? 'unidad' : 'unidades'} (${item.totalConsumedMl.toLocaleString('es-AR')} ml)`
+                            : `${item.totalConsumedMl.toLocaleString('es-AR')} ml`}
                         </span>
-                        <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800">
+                        <Badge variant="outline" className={`text-[10px] ${item.sellAsWholeUnit ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800' : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800'}`}>
                           {item.sellAsWholeUnit ? 'Venta directa' : 'Recetas'}
                         </Badge>
                       </div>
@@ -619,6 +680,13 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
                   );
                 })}
               </div>
+            </CardContent>
+          </Card>
+        )}
+        {isLoadingMovements && consumptionData.length === 0 && (
+          <Card className="rounded-2xl">
+            <CardContent className="p-4">
+              <Skeleton className="h-6 w-48" />
             </CardContent>
           </Card>
         )}
@@ -653,11 +721,11 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
               <div>
                 <p className="text-xs text-muted-foreground">Para devolver</p>
                 <p className="text-xl font-semibold">{returnableStock.length}</p>
-                {(consumedStock.length > 0 || partialStock.length > 0) && (
+                {(consumptionData.length > 0 || partialStock.length > 0) && (
                   <p className="text-xs text-muted-foreground">
                     {partialStock.length > 0 && `${partialStock.length} remanentes`}
-                    {partialStock.length > 0 && consumedStock.length > 0 && ' + '}
-                    {consumedStock.length > 0 && `${consumedStock.length} consumidos`}
+                    {partialStock.length > 0 && consumptionData.length > 0 && ' + '}
+                    {consumptionData.length > 0 && `${consumptionData.length} consumidos`}
                   </p>
                 )}
               </div>
@@ -840,7 +908,7 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
                 })}
 
                 {/* Separator between returnable and consumed */}
-                {consumedStock.length > 0 && returnableStock.length > 0 && (
+                {consumptionData.length > 0 && returnableStock.length > 0 && (
                   <TableRow className="hover:bg-transparent">
                     <TableCell
                       colSpan={showBarColumn ? 8 : 7}
@@ -849,8 +917,8 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <div className="h-px flex-1 bg-border" />
                         <span className="flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3 text-purple-500" />
-                          Utilizados durante el evento ({consumedStock.length})
+                          <Zap className="h-3 w-3 text-purple-500" />
+                          Consumidos durante el evento ({consumptionData.length})
                         </span>
                         <div className="h-px flex-1 bg-border" />
                       </div>
@@ -858,13 +926,11 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
                   </TableRow>
                 )}
 
-                {/* Consumed items -- styled as completed, non-selectable */}
-                {consumedStock.map((item) => {
-                  const key = stockKey(item);
-                  const drinkVol = item.drink?.volume || 0;
-                  const totalUnits = drinkVol > 0
-                    ? Math.floor(Math.abs(item.quantity) / drinkVol)
-                    : 0;
+                {/* Consumed items from inventory movements */}
+                {consumptionData.map((item) => {
+                  const key = `consumed-${item.drinkId}-${item.supplierId}-${item.sellAsWholeUnit}`;
+                  const units = item.drinkVolume > 0 ? (item.totalConsumedMl / item.drinkVolume) : 0;
+                  const displayUnits = units % 1 === 0 ? units.toString() : units.toFixed(1);
                   return (
                     <TableRow
                       key={key}
@@ -872,54 +938,45 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
                     >
                       <TableCell>
                         <div className="h-4 w-4 flex items-center justify-center">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-purple-400" />
+                          <Zap className="h-3.5 w-3.5 text-purple-400" />
                         </div>
                       </TableCell>
                       {showBarColumn && (
                         <TableCell className="text-sm text-muted-foreground">
-                          {(item as StockWithBar).barName || 'Barra desconocida'}
+                          Todas
                         </TableCell>
                       )}
                       <TableCell>
                         <div className="text-muted-foreground">
-                          {item.drink?.name || 'Insumo desconocido'}
-                          {item.drink?.brand && (
+                          {item.drinkName}
+                          {item.drinkBrand && (
                             <span className="text-xs text-muted-foreground ml-1">
-                              ({item.drink.brand})
+                              ({item.drinkBrand})
                             </span>
                           )}
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {item.supplier?.name || 'Proveedor desconocido'}
+                        {item.supplierName}
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
-                          {totalUnits} {totalUnits === 1 ? 'unidad' : 'unidades'}
+                          {displayUnits} {units === 1 ? 'unidad' : 'unidades'}
                         </span>
-                        {drinkVol > 0 && (
-                          <span className="text-xs text-muted-foreground/60 ml-1">
-                            ({drinkVol} ml c/u)
-                          </span>
-                        )}
+                        <span className="text-xs text-muted-foreground/60 ml-1">
+                          ({item.totalConsumedMl.toLocaleString('es-AR')} ml)
+                        </span>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {formatCurrency(item.unitCost, item.currency)}
+                        —
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={
-                            item.ownershipMode === 'consignment'
-                              ? 'bg-orange-50 text-orange-600 border-orange-200'
-                              : 'bg-green-50 text-green-600 border-green-200'
-                          }
-                        >
-                          {item.ownershipMode === 'consignment' ? 'Consignación' : 'Comprado'}
+                        <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200">
+                          Consumido
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800">
+                        <Badge variant="outline" className={`text-xs ${item.sellAsWholeUnit ? 'bg-green-50 text-green-600 border-green-200' : 'bg-blue-50 text-blue-600 border-blue-200'}`}>
                           {item.sellAsWholeUnit ? 'Venta directa' : 'Recetas'}
                         </Badge>
                       </TableCell>
@@ -1028,10 +1085,10 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
                         </div>
                       )}
                     </div>
-                    {consumedStock.length > 0 && (
+                    {consumptionData.length > 0 && (
                       <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <Info className="h-3.5 w-3.5 shrink-0" />
-                        {consumedStock.length} {consumedStock.length === 1 ? 'item' : 'items'} consumidos durante el evento (no requieren devolución)
+                        {consumptionData.length} {consumptionData.length === 1 ? 'insumo' : 'insumos'} consumidos durante el evento (no requieren devolución)
                       </p>
                     )}
                     <div className="flex items-start gap-2 text-xs text-muted-foreground">

@@ -10,6 +10,7 @@ import { TopProductsChart } from './TopProductsChart';
 import { BarBreakdownTable } from './BarBreakdownTable';
 import { PosBreakdownTable } from './PosBreakdownTable';
 import { StockValuationTable } from './StockValuationTable';
+import { SalesHistoryTable } from './SalesHistoryTable';
 import {
   AlertTriangle,
   Loader2,
@@ -20,6 +21,7 @@ import {
   CreditCard,
   Package,
   RefreshCw,
+  ShoppingCart,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -117,10 +119,14 @@ export function EventReportTab({ eventId, eventName }: EventReportTabProps) {
 
       {/* Tabs for different views */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Resumen</span>
+          </TabsTrigger>
+          <TabsTrigger value="sales" className="flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4" />
+            <span className="hidden sm:inline">Ventas</span>
           </TabsTrigger>
           <TabsTrigger value="peak-hours" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
@@ -153,6 +159,10 @@ export function EventReportTab({ eventId, eventName }: EventReportTabProps) {
             />
           )}
           <TopProductsChart data={report.topProducts} limit={10} />
+        </TabsContent>
+
+        <TabsContent value="sales">
+          <SalesHistoryTable eventId={eventId} />
         </TabsContent>
 
         <TabsContent value="peak-hours">

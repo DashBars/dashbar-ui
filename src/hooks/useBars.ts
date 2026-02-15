@@ -18,6 +18,7 @@ export function useBars(eventId: number) {
   return useQuery({
     queryKey: barsKeys.list(eventId),
     queryFn: () => barsApi.getBars(eventId),
+    refetchInterval: 10_000,
     retry: (failureCount, error: any) => {
       // Don't retry on 401 (unauthorized)
       if (error?.response?.status === 401) {

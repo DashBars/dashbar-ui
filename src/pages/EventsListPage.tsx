@@ -24,8 +24,9 @@ import { SortableTableHead, useTableSort, sortItems } from '@/components/ui/sort
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEvents, useUnarchiveEvent } from '@/hooks/useEvents';
 import { EventFormDialog } from '@/components/events/EventFormDialog';
+import { useDemoSetup } from '@/hooks/useDemo';
 import type { Event, EventStatus } from '@/lib/api/types';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 // Use persisted status from backend (source of truth)
 function getEventStatus(event: Event): EventStatus {
   return event.status || 'upcoming'; // Fallback to upcoming if status is missing
@@ -66,6 +67,7 @@ export function EventsListPage() {
   const navigate = useNavigate();
   const { data: events = [], isLoading } = useEvents();
   const { mutate: unarchiveEvent, isPending: isUnarchiving } = useUnarchiveEvent();
+  const { mutate: setupDemo, isPending: isSettingUpDemo } = useDemoSetup();
 
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -187,12 +189,30 @@ export function EventsListPage() {
             Gestioná tus eventos y su ciclo de vida
           </p>
         </div>
-        {events.length > 0 && (
-          <Button onClick={handleCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Crear evento
+        <div className="flex items-center gap-2">
+          {events.length > 0 && (
+            <Button onClick={handleCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Crear evento
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            onClick={() =>
+              setupDemo(undefined, {
+                onSuccess: (data) => {
+                  if (data.event) {
+                    navigate(`/events/${data.event.id}`);
+                  }
+                },
+              })
+            }
+            disabled={isSettingUpDemo}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            {isSettingUpDemo ? 'Creando...' : 'Evento Demo'}
           </Button>
-        )}
+        </div>
       </div>
 
       {events.length === 0 && !isLoading ? (

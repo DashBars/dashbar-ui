@@ -23,7 +23,7 @@ import { BarsTable } from '@/components/bars/BarsTable';
 import { BarFormDialog } from '@/components/bars/BarFormDialog';
 import { useBars } from '@/hooks/useBars';
 import type { Event as ApiEvent, EventStatus, Bar, BarType, BarStatus } from '@/lib/api/types';
-import { ChevronRight, Calendar, MapPin, Trash2, Play, Cog, Pencil, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { ChevronRight, Calendar, MapPin, Trash2, Play, Cog, Pencil, ArrowLeft, AlertTriangle, Sparkles, Square } from 'lucide-react';
 import { useEventRecipes } from '@/hooks/useRecipes';
 import {
   DropdownMenu,
@@ -37,6 +37,13 @@ import { PosManagementTab } from '@/components/pos';
 import { EventReportTab } from '@/components/reports';
 import { BarPostEventOverview } from '@/components/bars/BarPostEventOverview';
 import { AssignStockWizard } from '@/components/bars/AssignStockWizard';
+import { EventAlarmsTab } from '@/components/events/EventAlarmsTab';
+import { useAlerts } from '@/hooks/useAlarms';
+import {
+  useDemoSimulationStatus,
+  useStartSimulation,
+  useStopSimulation,
+} from '@/hooks/useDemo';
 
 // Use persisted status from backend (source of truth)
 function getEventStatus(event: ApiEvent): EventStatus {
@@ -106,6 +113,17 @@ export function EventDetailsPage() {
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingBar, setEditingBar] = useState<Bar | null>(null);
   const [stockWizardOpen, setStockWizardOpen] = useState(false);
+
+  // Alarms: count active alerts for badge
+  const showAlarmsTab = status === 'upcoming' || status === 'active';
+  const { data: activeAlerts = [] } = useAlerts(eventIdNum, 'active');
+  const activeAlertCount = activeAlerts.length;
+
+  // Demo simulation
+  const { data: simStatus } = useDemoSimulationStatus(eventIdNum);
+  const { mutate: startSim, isPending: isStartingSim } = useStartSimulation(eventIdNum);
+  const { mutate: stopSim, isPending: isStoppingSim } = useStopSimulation(eventIdNum);
+  const isSimulating = simStatus?.running ?? false;
 
   // Compute recipe ingredient warnings PER BAR at the event level
   // Each bar of a given type is checked individually
@@ -291,7 +309,32 @@ export function EventDetailsPage() {
             </DropdownMenu>
           )}
           {status === 'active' && (
-            <FinishEventButton event={event} />
+            <>
+              {isSimulating ? (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => stopSim()}
+                  disabled={isStoppingSim}
+                >
+                  <Square className="mr-2 h-3.5 w-3.5" />
+                  {isStoppingSim
+                    ? 'Deteniendo...'
+                    : `Detener demo (${simStatus?.salesCount ?? 0} ventas)`}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => startSim()}
+                  disabled={isStartingSim}
+                >
+                  <Sparkles className="mr-2 h-3.5 w-3.5" />
+                  {isStartingSim ? 'Iniciando...' : 'Simular ventas'}
+                </Button>
+              )}
+              <FinishEventButton event={event} />
+            </>
           )}
           {status === 'finished' && (
             <Button
@@ -340,6 +383,16 @@ export function EventDetailsPage() {
           )}
           <TabsTrigger value="bars">Barras</TabsTrigger>
           <TabsTrigger value="recipes">Recetas y Productos</TabsTrigger>
+          {showAlarmsTab && (
+            <TabsTrigger value="alarms" className="relative">
+              Alarmas
+              {activeAlertCount > 0 && (
+                <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {activeAlertCount}
+                </span>
+              )}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="pos">POS</TabsTrigger>
           {isFinished && (
             <TabsTrigger value="reports">Reportes</TabsTrigger>
@@ -349,7 +402,7 @@ export function EventDetailsPage() {
         {/* Monitoring - only for active events */}
         {isActive && (
           <TabsContent value="monitoring" className="space-y-4">
-            <EventMonitoringTab eventId={eventIdNum} />
+            <EventMonitoringTab eventId={eventIdNum} onNavigateToAlarms={() => setActiveTab('alarms')} />
           </TabsContent>
         )}
 
@@ -395,6 +448,12 @@ export function EventDetailsPage() {
             onNavigateToBarras={() => setActiveTab('bars')}
           />
         </TabsContent>
+
+        {showAlarmsTab && (
+          <TabsContent value="alarms" className="space-y-4">
+            <EventAlarmsTab eventId={eventIdNum} isActive={isActive} />
+          </TabsContent>
+        )}
 
         <TabsContent value="pos" className="space-y-4">
           <PosManagementTab eventId={eventIdNum} />

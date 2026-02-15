@@ -22,6 +22,7 @@ export interface RecentSale {
   totalAmount: number;
   barId: number;
   barName?: string;
+  isDirectSale?: boolean;
   createdAt: string;
 }
 
@@ -59,7 +60,7 @@ export interface EventDashboardState {
 
 const MAX_RECENT_SALES = 25;
 const MAX_ALERTS = 15;
-const REFETCH_INTERVAL = 60_000; // 60s fallback re-fetch
+const REFETCH_INTERVAL = 10_000; // 10s fallback re-fetch
 
 export function useEventDashboard(eventId: number) {
   const queryClient = useQueryClient();
@@ -157,6 +158,7 @@ export function useEventDashboard(eventId: number) {
         totalAmount: payload.data.totalAmount,
         barId: payload.barId,
         barName: barNamesRef.current.get(payload.barId),
+        isDirectSale: payload.data.isDirectSale ?? false,
         createdAt: payload.data.createdAt as string,
       };
 

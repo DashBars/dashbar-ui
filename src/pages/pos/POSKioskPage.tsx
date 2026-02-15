@@ -623,10 +623,10 @@ export function POSKioskPage() {
                 {lastSale.items.map((item) => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <div>
-                      <span>{item.quantity}x {item.productName}</span>
+                      <span>{item.quantity}x {item.productNameSnapshot}</span>
                       {item.quantity > 1 && (
                         <span className="text-xs text-muted-foreground ml-1">
-                          ({formatCurrency(item.unitPrice)} c/u)
+                          ({formatCurrency(item.unitPriceSnapshot)} c/u)
                         </span>
                       )}
                     </div>

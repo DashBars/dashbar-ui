@@ -1,4 +1,4 @@
-﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi } from '@/lib/api/dashbar';
 import type { CreateProductDto, UpdateProductDto } from '@/lib/api/types';
 import { toast } from 'sonner';
@@ -19,6 +19,7 @@ export function useEventProducts(eventId: number, barId?: number) {
     queryKey: productsKeys.list(eventId, barId),
     queryFn: () => productsApi.getProducts(eventId, barId),
     enabled: !!eventId,
+    refetchInterval: 10_000,
   });
 }
 

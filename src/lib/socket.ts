@@ -9,7 +9,8 @@ let socket: Socket | null = null;
  * Authenticates using the user's JWT stored in localStorage.
  */
 export function getSocket(): Socket {
-  if (socket?.connected) return socket;
+  // Return existing socket even if still connecting (avoid re-creation loop)
+  if (socket) return socket;
 
   const token = localStorage.getItem('auth_token');
 
