@@ -658,13 +658,12 @@ export function EventAlarmsTab({ eventId, isActive }: EventAlarmsTabProps) {
               ))}
             </div>
           ) : filteredAlerts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-              <CheckCircle2 className="h-10 w-10 mb-3 opacity-30 text-green-500" />
-              <p className="text-sm font-medium">Sin alertas</p>
-              <p className="text-xs mt-1">
+            <div className="flex items-center gap-3 py-3 px-4 rounded-lg bg-green-50/50 dark:bg-green-950/20 border border-green-100 dark:border-green-900">
+              <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+              <p className="text-sm text-muted-foreground">
                 {alertFilter !== 'all'
                   ? 'No hay alertas con este filtro.'
-                  : 'Todos los stocks estan dentro de los umbrales configurados.'}
+                  : 'Sin alertas — todos los stocks están dentro de los umbrales configurados.'}
               </p>
             </div>
           ) : (

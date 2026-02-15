@@ -180,14 +180,6 @@ export function PosTable({ posnets, eventId, onEdit }: PosTableProps) {
             >
               Tráfico
             </SortableTableHead>
-            <SortableTableHead
-              sortKey="lastHeartbeatAt"
-              currentSort={sortKey}
-              currentDirection={sortDir}
-              onSort={handleSort}
-            >
-              Última Señal
-            </SortableTableHead>
             <TableHead className="w-[80px]"></TableHead>
           </TableRow>
         </TableHeader>
@@ -230,9 +222,6 @@ export function PosTable({ posnets, eventId, onEdit }: PosTableProps) {
                     {posnet.traffic}%
                   </span>
                 </div>
-              </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                {formatRelativeTime(posnet.lastHeartbeatAt)}
               </TableCell>
               <TableCell>
                 <DropdownMenu>

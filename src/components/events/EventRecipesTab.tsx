@@ -633,7 +633,12 @@ export function EventRecipesTab({ eventId, isEditable, showWarnings = true, onNa
                   {/* Bar availability */}
                   {isDirectSale ? (
                     (() => {
-                      const barsWithProduct = directSaleBarMap.get(recipe.cocktailName.toLowerCase()) || [];
+                      // For direct-sale, the map is keyed by drink name, not cocktail name
+                      const drinkName = recipe.components?.[0]?.drink?.name?.toLowerCase();
+                      const barsWithProduct =
+                        (drinkName && directSaleBarMap.get(drinkName)) ||
+                        directSaleBarMap.get(recipe.cocktailName.toLowerCase()) ||
+                        [];
                       return barsWithProduct.length > 0 ? (
                         <div className="flex flex-wrap items-center gap-1.5 mt-auto pt-3 border-t mt-3">
                           <span className="text-xs text-muted-foreground">Disponible en:</span>
