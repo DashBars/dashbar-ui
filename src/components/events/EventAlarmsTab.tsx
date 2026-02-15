@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   Plus,
@@ -495,6 +496,8 @@ function DonorSuggestionsList({
 // ── Main Component ──
 
 export function EventAlarmsTab({ eventId, isActive }: EventAlarmsTabProps) {
+  const navigate = useNavigate();
+
   // Threshold state
   const { data: thresholds = [], isLoading: thresholdsLoading } =
     useThresholds(eventId);
@@ -1134,18 +1137,13 @@ export function EventAlarmsTab({ eventId, isActive }: EventAlarmsTabProps) {
                   <span className="font-medium">Tipo:</span>{' '}
                   {assignDialog.sellAsWholeUnit ? 'Venta directa' : 'Recetas'}
                 </p>
-                <p className="text-sm">
-                  <span className="font-medium">Cantidad sugerida:</span>{' '}
-                  {Math.max(assignDialog.neededQuantity, 1)} un.
-                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Dirigite a Inventario General &gt; {assignDialog.drinkName} &gt;
-                Asignar a barra para completar esta accion.
-              </p>
             </div>
-            <DialogFooter>
-              <Button onClick={() => setAssignDialog(null)}>Entendido</Button>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setAssignDialog(null)}>Cancelar</Button>
+              <Button onClick={() => { setAssignDialog(null); navigate('/suppliers'); }}>
+                Ir al inventario
+              </Button>
             </DialogFooter>
           </DialogContent>
         )}

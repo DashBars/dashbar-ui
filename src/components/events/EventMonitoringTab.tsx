@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   DollarSign,
   Package,
@@ -288,6 +288,69 @@ function CollapsibleSalesCard({ sales, bars }: { sales: RecentSale[]; bars: Bar[
   );
 }
 
+// ── Collapsible Stock Card ──
+
+function CollapsibleStockCard({ bars, thresholds, isLoading }: { bars: Bar[]; thresholds: StockThreshold[]; isLoading: boolean }) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  const criticalCount = useMemo(() => {
+    if (!bars.length || !thresholds.length) return 0;
+    const thresholdMap = new Map<string, number>();
+    thresholds.forEach((t) => thresholdMap.set(`${t.drinkId}-${t.sellAsWholeUnit}`, t.lowerThreshold));
+    const agg = new Map<string, { ml: number; vol: number }>();
+    bars.forEach((bar) => {
+      (bar.stocks || []).forEach((s: any) => {
+        const key = `${s.drinkId}-${s.sellAsWholeUnit}`;
+        const ex = agg.get(key);
+        if (ex) ex.ml += s.quantity;
+        else agg.set(key, { ml: s.quantity, vol: s.drink?.volume ?? 1 });
+      });
+    });
+    let count = 0;
+    for (const [key, data] of agg.entries()) {
+      const th = thresholdMap.get(key);
+      if (th != null && Math.floor(data.ml / data.vol) <= th) count++;
+    }
+    return count;
+  }, [bars, thresholds]);
+
+  return (
+    <Card className="rounded-2xl">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between px-6 py-4 text-left hover:bg-muted/30 transition-colors rounded-2xl"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="flex items-center gap-2 text-base font-semibold">
+          <Boxes className="h-4 w-4" />
+          Stock en tiempo real
+          {criticalCount > 0 && (
+            <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 text-[10px] ml-1">
+              {criticalCount} critico{criticalCount > 1 ? 's' : ''}
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </div>
+      </button>
+      {isOpen && (
+        <CardContent className="pt-0">
+          {isLoading ? (
+            <div className="space-y-2">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full rounded" />
+              ))}
+            </div>
+          ) : (
+            <StockOverviewTable bars={bars} thresholds={thresholds} />
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 // ── Stock Overview Table ──
 
 interface StockRow {
@@ -299,10 +362,25 @@ interface StockRow {
   totalMl: number;
   units: number;
   threshold: number | null;
+  perBar: Array<{ barId: number; barName: string; ml: number; units: number }>;
+}
+
+function stockStatusBadge(units: number, threshold: number | null): React.ReactNode {
+  if (threshold == null) return <Badge variant="secondary" className="text-[10px]">Sin umbral</Badge>;
+  if (units <= threshold) return <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 text-[10px]">Critico</Badge>;
+  if (units <= threshold * 1.5) return <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 text-[10px]">Bajo</Badge>;
+  return <Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 text-[10px]">OK</Badge>;
+}
+
+function stockRowBg(units: number, threshold: number | null): string {
+  if (threshold != null && units <= threshold) return 'bg-red-50/50 dark:bg-red-950/10';
+  if (threshold != null && units <= threshold * 1.5) return 'bg-amber-50/50 dark:bg-amber-950/10';
+  return '';
 }
 
 function StockOverviewTable({ bars, thresholds }: { bars: Bar[]; thresholds: StockThreshold[] }) {
-  // Build threshold lookup: `drinkId-sellAsWholeUnit` -> lowerThreshold
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+
   const thresholdMap = useMemo(() => {
     const map = new Map<string, number>();
     thresholds.forEach((t) => {
@@ -311,18 +389,19 @@ function StockOverviewTable({ bars, thresholds }: { bars: Bar[]; thresholds: Sto
     return map;
   }, [thresholds]);
 
-  // Aggregate stock across all bars by drinkId + sellAsWholeUnit
   const rows = useMemo(() => {
     const agg = new Map<string, StockRow>();
 
     bars.forEach((bar) => {
       (bar.stocks || []).forEach((s: any) => {
         const key = `${s.drinkId}-${s.sellAsWholeUnit}`;
-        const existing = agg.get(key);
         const drinkVol = s.drink?.volume ?? 1;
+        const barEntry = { barId: bar.id, barName: bar.name, ml: s.quantity as number, units: Math.floor((s.quantity as number) / drinkVol) };
+        const existing = agg.get(key);
         if (existing) {
           existing.totalMl += s.quantity;
           existing.units = Math.floor(existing.totalMl / drinkVol);
+          existing.perBar.push(barEntry);
         } else {
           agg.set(key, {
             drinkId: s.drinkId,
@@ -333,12 +412,12 @@ function StockOverviewTable({ bars, thresholds }: { bars: Bar[]; thresholds: Sto
             totalMl: s.quantity,
             units: Math.floor(s.quantity / drinkVol),
             threshold: thresholdMap.get(key) ?? null,
+            perBar: [barEntry],
           });
         }
       });
     });
 
-    // Update thresholds after aggregation
     for (const [key, row] of agg.entries()) {
       row.threshold = thresholdMap.get(key) ?? null;
     }
@@ -356,10 +435,11 @@ function StockOverviewTable({ bars, thresholds }: { bars: Bar[]; thresholds: Sto
   }
 
   return (
-    <div className="rounded-md border max-h-[400px] overflow-y-auto">
+    <div className="rounded-md border max-h-[500px] overflow-y-auto">
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-[30px]"></TableHead>
             <TableHead>Insumo</TableHead>
             <TableHead>Tipo</TableHead>
             <TableHead className="text-right">Stock (un.)</TableHead>
@@ -369,59 +449,80 @@ function StockOverviewTable({ bars, thresholds }: { bars: Bar[]; thresholds: Sto
         </TableHeader>
         <TableBody>
           {rows.map((row) => {
-            let statusBadge: React.ReactNode;
-            if (row.threshold == null) {
-              statusBadge = <Badge variant="secondary" className="text-[10px]">Sin umbral</Badge>;
-            } else if (row.units <= row.threshold) {
-              statusBadge = <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 text-[10px]">Critico</Badge>;
-            } else if (row.units <= row.threshold * 1.5) {
-              statusBadge = <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 text-[10px]">Bajo</Badge>;
-            } else {
-              statusBadge = <Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 text-[10px]">OK</Badge>;
-            }
+            const key = `${row.drinkId}-${row.sellAsWholeUnit}`;
+            const isExpanded = expandedKey === key;
+            const hasBars = row.perBar.length > 1;
 
             return (
-              <TableRow
-                key={`${row.drinkId}-${row.sellAsWholeUnit}`}
-                className={
-                  row.threshold != null && row.units <= row.threshold
-                    ? 'bg-red-50/50 dark:bg-red-950/10'
-                    : row.threshold != null && row.units <= row.threshold * 1.5
-                      ? 'bg-amber-50/50 dark:bg-amber-950/10'
-                      : ''
-                }
-              >
-                <TableCell>
-                  <div>
-                    <p className="font-medium text-sm">{row.drinkName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {row.drinkBrand} &middot; {row.drinkVolume} ml
-                    </p>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {row.sellAsWholeUnit ? (
-                    <Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 text-[10px] gap-0.5">
-                      <Package className="h-3 w-3" />
-                      Directa
-                    </Badge>
-                  ) : (
-                    <Badge className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 text-[10px] gap-0.5">
-                      <Wine className="h-3 w-3" />
-                      Recetas
-                    </Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-right font-mono text-sm">
-                  {row.units}
-                </TableCell>
-                <TableCell className="text-right font-mono text-sm text-muted-foreground">
-                  {row.threshold != null ? row.threshold : '—'}
-                </TableCell>
-                <TableCell className="text-center">
-                  {statusBadge}
-                </TableCell>
-              </TableRow>
+              <React.Fragment key={key}>
+                <TableRow
+                  className={`${stockRowBg(row.units, row.threshold)} ${hasBars ? 'cursor-pointer hover:bg-muted/40' : ''}`}
+                  onClick={() => hasBars && setExpandedKey(isExpanded ? null : key)}
+                >
+                  <TableCell className="w-[30px] px-2">
+                    {hasBars && (
+                      isExpanded
+                        ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+                        : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium text-sm">{row.drinkName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {row.drinkBrand} &middot; {row.drinkVolume} ml
+                        {hasBars && <span className="ml-1">({row.perBar.length} barras)</span>}
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {row.sellAsWholeUnit ? (
+                      <Badge className="bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 text-[10px] gap-0.5">
+                        <Package className="h-3 w-3" />
+                        Directa
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 text-[10px] gap-0.5">
+                        <Wine className="h-3 w-3" />
+                        Recetas
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {row.units}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                    {row.threshold != null ? row.threshold : '—'}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {stockStatusBadge(row.units, row.threshold)}
+                  </TableCell>
+                </TableRow>
+                {isExpanded && row.perBar.map((bar) => (
+                  <TableRow
+                    key={`${key}-bar-${bar.barId}`}
+                    className={`${stockRowBg(bar.units, row.threshold)} bg-muted/20`}
+                  >
+                    <TableCell></TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2 pl-2">
+                        <Store className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="text-sm text-muted-foreground">{bar.barName}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell></TableCell>
+                    <TableCell className="text-right font-mono text-sm">
+                      {bar.units}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                      {row.threshold != null ? row.threshold : '—'}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {stockStatusBadge(bar.units, row.threshold)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </React.Fragment>
             );
           })}
         </TableBody>
@@ -762,26 +863,8 @@ export function EventMonitoringTab({ eventId, onNavigateToAlarms }: EventMonitor
         />
       </div>
 
-      {/* Row 2: Stock overview (event-level) */}
-      <Card className="rounded-2xl">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Boxes className="h-4 w-4" />
-            Stock en tiempo real
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {barsLoading ? (
-            <div className="space-y-2">
-              {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full rounded" />
-              ))}
-            </div>
-          ) : (
-            <StockOverviewTable bars={bars} thresholds={thresholds} />
-          )}
-        </CardContent>
-      </Card>
+      {/* Row 2: Stock overview (event-level, collapsible) */}
+      <CollapsibleStockCard bars={bars} thresholds={thresholds} isLoading={barsLoading} />
 
       {/* Row 3: Sales Table (full width, collapsible card) */}
       <CollapsibleSalesCard sales={recentSales} bars={bars} />

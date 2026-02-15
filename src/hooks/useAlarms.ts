@@ -23,7 +23,7 @@ export function useThresholds(eventId: number) {
     queryKey: alarmsKeys.thresholds(eventId),
     queryFn: () => alarmsApi.getThresholds(eventId),
     enabled: !!eventId,
-    refetchInterval: 10_000,
+    refetchInterval: 5_000,
   });
 }
 
@@ -91,7 +91,7 @@ export function useAlerts(eventId: number, status?: AlertStatus) {
     queryKey: alarmsKeys.alerts(eventId, status),
     queryFn: () => alarmsApi.getAlerts(eventId, status),
     enabled: !!eventId,
-    refetchInterval: 15_000, // poll every 15 s to catch new alerts
+    refetchInterval: 5_000,
   });
 }
 
@@ -121,7 +121,7 @@ export function useForceCheck(eventId: number) {
       if (alerts.length) {
         toast.warning(
           `${alerts.length} alerta${alerts.length !== 1 ? 's' : ''} de stock bajo detectada${alerts.length !== 1 ? 's' : ''}. Revisá las opciones de redistribución.`,
-          { duration: 6000 },
+          { duration: Infinity },
         );
       } else {
         toast.success('Todos los stocks están dentro de los umbrales configurados.');

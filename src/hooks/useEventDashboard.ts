@@ -60,7 +60,7 @@ export interface EventDashboardState {
 
 const MAX_RECENT_SALES = 25;
 const MAX_ALERTS = 15;
-const REFETCH_INTERVAL = 10_000; // 10s fallback re-fetch
+const REFETCH_INTERVAL = 5_000; // 5s fallback re-fetch
 
 export function useEventDashboard(eventId: number) {
   const queryClient = useQueryClient();

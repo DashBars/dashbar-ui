@@ -64,7 +64,7 @@ export function POSKioskPage() {
   } = useQuery({
     queryKey: ['pos-config', posnetId],
     queryFn: () => posDeviceApi.getConfig(Number(posnetId)),
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 15000,
     retry: 1,
   });
 

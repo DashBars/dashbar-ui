@@ -19,7 +19,7 @@ export function useEventProducts(eventId: number, barId?: number) {
     queryKey: productsKeys.list(eventId, barId),
     queryFn: () => productsApi.getProducts(eventId, barId),
     enabled: !!eventId,
-    refetchInterval: 10_000,
+    refetchInterval: 5_000,
   });
 }
 

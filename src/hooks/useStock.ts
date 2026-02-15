@@ -22,7 +22,7 @@ export function useStock(eventId: number, barId: number) {
     queryKey: stockKeys.list(eventId, barId),
     queryFn: () => stockApi.getStock(eventId, barId),
     enabled: !!eventId && !!barId,
-    refetchInterval: 10_000,
+    refetchInterval: 5_000,
   });
 }
 
@@ -49,7 +49,7 @@ export function useStockSummary(eventId: number, barId: number) {
     queryKey: stockKeys.summary(eventId, barId),
     queryFn: () => stockApi.getStockSummary(eventId, barId),
     enabled: !!eventId && !!barId,
-    refetchInterval: 10_000,
+    refetchInterval: 5_000,
   });
 }
 

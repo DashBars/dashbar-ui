@@ -15,7 +15,7 @@ export function useInventoryMovements(eventId: number, barId: number) {
     queryKey: inventoryMovementsKeys.list(eventId, barId),
     queryFn: () => inventoryMovementsApi.findAll(eventId, barId),
     enabled: !!eventId && !!barId,
-    refetchInterval: 10_000,
+    refetchInterval: 5_000,
   });
 }
 
