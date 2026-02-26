@@ -363,6 +363,22 @@ function ComparisonResults({
       : null;
 
   const readableInsights = data.insights
+    .filter((insight) => {
+      // Extra guard against noisy insights in tiny samples.
+      if (
+        insight.type === 'peak_time_pattern' &&
+        (insight.data?.eventsWithPeak ?? 0) < 2
+      ) {
+        return false;
+      }
+      if (
+        insight.type === 'consistent_top_product' &&
+        (insight.data?.eventsInTop5 ?? 0) < 2
+      ) {
+        return false;
+      }
+      return true;
+    })
     .map((insight) => {
       if (insight.type === 'consistent_top_product') {
         return `Producto consistente: ${insight.data.name} aparece en top 5 en ${insight.data.eventsInTop5}/${insight.data.totalEvents} eventos (share promedio ${insight.data.avgSharePercent}%).`;
@@ -439,6 +455,9 @@ function ComparisonResults({
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <p className="mb-3 text-xs text-amber-800/80 dark:text-amber-300/80">
+              Resumen automatico sobre patrones repetidos entre los eventos seleccionados.
+            </p>
             <div className="space-y-3">
               {readableInsights.map((insight, i) => (
                 <div
@@ -604,7 +623,7 @@ function ComparisonResults({
               Productos Cross-Evento
             </CardTitle>
             <CardDescription>
-              Productos que aparecen en multiples eventos y su rendimiento comparado
+              Productos presentes en varios eventos, consolidando una unica fila por evento.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -622,20 +641,43 @@ function ComparisonResults({
                       </span>
                     </div>
                   </div>
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Se muestra 1 tarjeta por evento comparado para este producto.
+                  </p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                    {product.byEvent.map((evt) => (
-                      <div
-                        key={evt.eventId}
-                        className="p-2 bg-slate-50 dark:bg-slate-900 rounded"
-                      >
-                        <div className="text-xs text-muted-foreground truncate">{evt.eventName}</div>
-                        <div className="font-medium">{evt.unitsSold} uds</div>
-                        <div className="text-xs text-green-600 dark:text-green-400">
-                          {formatCurrency(evt.revenue)} ({evt.sharePercent}%)
+                    {Array.from(
+                      product.byEvent.reduce((acc, evt) => {
+                        const prev = acc.get(evt.eventId);
+                        if (!prev) {
+                          acc.set(evt.eventId, { ...evt });
+                          return acc;
+                        }
+                        // Defensive UI merge in case backend sends duplicates.
+                        acc.set(evt.eventId, {
+                          ...prev,
+                          unitsSold: prev.unitsSold + evt.unitsSold,
+                          revenue: prev.revenue + evt.revenue,
+                          sharePercent: Math.max(prev.sharePercent, evt.sharePercent),
+                          rank: Math.min(prev.rank, evt.rank),
+                        });
+                        return acc;
+                      }, new Map<number, (typeof product.byEvent)[number]>()),
+                    )
+                      .map(([, value]) => value)
+                      .sort((a, b) => b.revenue - a.revenue)
+                      .map((evt) => (
+                        <div
+                          key={evt.eventId}
+                          className="p-2 bg-slate-50 dark:bg-slate-900 rounded"
+                        >
+                          <div className="text-xs text-muted-foreground truncate">{evt.eventName}</div>
+                          <div className="font-medium">{evt.unitsSold} uds</div>
+                          <div className="text-xs text-green-600 dark:text-green-400">
+                            {formatCurrency(evt.revenue)} ({evt.sharePercent}%)
+                          </div>
+                          <div className="text-xs text-muted-foreground">Ranking: #{evt.rank}</div>
                         </div>
-                        <div className="text-xs text-muted-foreground">Ranking: #{evt.rank}</div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 </div>
               ))}
