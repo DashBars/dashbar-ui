@@ -46,7 +46,7 @@ import { toast } from 'sonner';
 
 function formatCurrency(cents: number): string {
   const dollars = cents / 100;
-  return `$${dollars.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  return `AR$ ${dollars.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
 function formatDate(dateString: string | null): string {
@@ -792,12 +792,12 @@ function TimeSeriesOverlayChart({ data }: { data: EventComparisonReport }) {
             tick={{ fontSize: 11 }}
           />
           <YAxis
-            tickFormatter={(v) => `$${v.toLocaleString()}`}
+            tickFormatter={(v) => `AR$ ${v.toLocaleString('es-AR')}`}
             tick={{ fontSize: 11 }}
           />
           <Tooltip
             formatter={(value, name) => [
-              `$${(value as number).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`,
+              `AR$ ${(value as number).toLocaleString('es-AR', { minimumFractionDigits: 0 })}`,
               name as string,
             ]}
             labelFormatter={(label) => `Hora ${label} desde inicio`}
