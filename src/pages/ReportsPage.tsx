@@ -364,28 +364,45 @@ function ComparisonResults({
 
   const readableInsights = data.insights
     .filter((insight) => {
+      const totalEvents =
+        Number(insight.data?.totalEvents) || sortedRows.length || 0;
+      const eventsInTop5 = Math.min(
+        Number(insight.data?.eventsInTop5) || 0,
+        totalEvents,
+      );
+      const eventsWithPeak = Math.min(
+        Number(insight.data?.eventsWithPeak) || 0,
+        totalEvents,
+      );
+
       // Extra guard against noisy insights in tiny samples.
-      if (
-        insight.type === 'peak_time_pattern' &&
-        (insight.data?.eventsWithPeak ?? 0) < 2
-      ) {
+      if (insight.type === 'peak_time_pattern' && eventsWithPeak < 2) {
         return false;
       }
-      if (
-        insight.type === 'consistent_top_product' &&
-        (insight.data?.eventsInTop5 ?? 0) < 2
-      ) {
+      if (insight.type === 'consistent_top_product' && eventsInTop5 < 2) {
         return false;
       }
       return true;
     })
     .map((insight) => {
       if (insight.type === 'consistent_top_product') {
-        return `Producto consistente: ${insight.data.name} aparece en top 5 en ${insight.data.eventsInTop5}/${insight.data.totalEvents} eventos (share promedio ${insight.data.avgSharePercent}%).`;
+        const totalEvents =
+          Number(insight.data?.totalEvents) || sortedRows.length || 0;
+        const eventsInTop5 = Math.min(
+          Number(insight.data?.eventsInTop5) || 0,
+          totalEvents,
+        );
+        return `Producto consistente: ${insight.data.name} aparece en top 5 en ${eventsInTop5}/${totalEvents} eventos (share promedio ${insight.data.avgSharePercent}%).`;
       }
       if (insight.type === 'peak_time_pattern') {
         const hour = String(insight.data.hourOfDay).padStart(2, '0');
-        return `Patron horario: el pico se concentra cerca de las ${hour}:00 en ${insight.data.eventsWithPeak}/${insight.data.totalEvents} eventos.`;
+        const totalEvents =
+          Number(insight.data?.totalEvents) || sortedRows.length || 0;
+        const eventsWithPeak = Math.min(
+          Number(insight.data?.eventsWithPeak) || 0,
+          totalEvents,
+        );
+        return `Patron horario: el pico se concentra cerca de las ${hour}:00 en ${eventsWithPeak}/${totalEvents} eventos.`;
       }
       if (insight.type === 'margin_outlier') {
         return `Margen atipico: ${insight.data.eventName} (${insight.data.marginPercent}%) vs promedio ${Math.round(insight.data.avgMargin)}%.`;
@@ -726,24 +743,25 @@ function ComparisonResults({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {data.peakTimePatterns.map((pattern) => (
-                <div key={pattern.hourOfDay} className="flex items-center gap-4 p-3 border rounded-lg">
-                  <div className="w-16 h-16 bg-blue-50 dark:bg-blue-950/30 rounded-lg flex flex-col items-center justify-center">
-                    <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+            <div className="space-y-2">
+              {data.peakTimePatterns.slice(0, 4).map((pattern) => (
+                <div key={pattern.hourOfDay} className="flex items-center gap-3 p-2.5 border rounded-lg">
+                  <div className="w-14 h-10 bg-blue-50 dark:bg-blue-950/30 rounded-md flex items-center justify-center">
+                    <div className="text-base font-bold text-blue-600 dark:text-blue-400">
                       {pattern.hourOfDay.toString().padStart(2, '0')}:00
                     </div>
                   </div>
                   <div className="flex-1">
-                    <div className="font-medium">
+                    <div className="text-sm font-medium">
                       Pico en {pattern.eventsWithPeak} de {data.eventComparison.length} eventos
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">
+                    <div className="text-xs text-muted-foreground mt-0.5">
                       {pattern.eventDetails.map((d) => d.eventName).join(', ')}
                     </div>
                   </div>
                   <Badge
                     variant={pattern.eventsWithPeak >= data.eventComparison.length / 2 ? 'default' : 'outline'}
+                    className="text-xs"
                   >
                     {Math.round((pattern.eventsWithPeak / data.eventComparison.length) * 100)}% consistencia
                   </Badge>
