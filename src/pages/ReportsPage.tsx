@@ -630,22 +630,8 @@ function ComparisonResults({
             <div className="space-y-3">
               {data.crossEventProducts.slice(0, 10).map((product) => (
                 <div key={product.cocktailId || product.name} className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium">{product.name}</div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">
-                        {product.eventsAppeared} evento(s)
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">
-                        Promedio: {product.avgSharePercent}% del total
-                      </span>
-                    </div>
-                  </div>
-                  <p className="mb-2 text-xs text-muted-foreground">
-                    Se muestra 1 tarjeta por evento comparado para este producto.
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                    {Array.from(
+                  {(() => {
+                    const uniqueEventRows = Array.from(
                       product.byEvent.reduce((acc, evt) => {
                         const prev = acc.get(evt.eventId);
                         if (!prev) {
@@ -664,14 +650,34 @@ function ComparisonResults({
                       }, new Map<number, (typeof product.byEvent)[number]>()),
                     )
                       .map(([, value]) => value)
-                      .sort((a, b) => b.revenue - a.revenue)
-                      .map((evt) => (
+                      .sort((a, b) => b.revenue - a.revenue);
+
+                    const uniqueEventCount = uniqueEventRows.length;
+
+                    return (
+                      <>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium">{product.name}</div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">
+                        {uniqueEventCount} evento(s)
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        Promedio: {product.avgSharePercent}% del total
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Se muestra 1 tarjeta por evento comparado para este producto.
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                    {uniqueEventRows.map((evt) => (
                         <div
                           key={evt.eventId}
                           className="p-2 bg-slate-50 dark:bg-slate-900 rounded"
                         >
                           <div className="text-xs text-muted-foreground truncate">{evt.eventName}</div>
-                          <div className="font-medium">{evt.unitsSold} uds</div>
+                          <div className="font-medium">{evt.unitsSold} unid.</div>
                           <div className="text-xs text-green-600 dark:text-green-400">
                             {formatCurrency(evt.revenue)} ({evt.sharePercent}%)
                           </div>
@@ -679,6 +685,9 @@ function ComparisonResults({
                         </div>
                       ))}
                   </div>
+                      </>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
