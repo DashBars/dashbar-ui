@@ -743,6 +743,9 @@ function ComparisonResults({
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Eventos seleccionados: {data.eventComparison.map((e) => e.eventName).join(' · ')}
+            </p>
             <div className="space-y-2">
               {data.peakTimePatterns.slice(0, 4).map((pattern) => (
                 <div key={pattern.hourOfDay} className="flex items-center gap-3 p-2.5 border rounded-lg">
@@ -756,7 +759,9 @@ function ComparisonResults({
                       Pico en {pattern.eventsWithPeak} de {data.eventComparison.length} eventos
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
-                      {pattern.eventDetails.map((d) => d.eventName).join(', ')}
+                      {pattern.eventsWithPeak === 1
+                        ? `Solo en: ${pattern.eventDetails[0]?.eventName || '-'}`
+                        : `En: ${pattern.eventDetails.map((d) => d.eventName).join(', ')}`}
                     </div>
                   </div>
                   <Badge
