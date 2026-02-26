@@ -18,6 +18,7 @@ interface BarsTableProps {
   isLoading: boolean;
   onViewDetails: (bar: Bar) => void;
   recipeWarnings?: BarRecipeWarning[];
+  canViewDetails?: boolean;
 }
 
 const barTypeStyles: Record<string, { badge: 'default' | 'secondary' | 'outline'; icon: string }> = {
@@ -34,7 +35,13 @@ const statusConfig: Record<string, { label: string; dot: string; badge: 'default
 };
 
 export function BarsTable(props: BarsTableProps) {
-  const { bars, isLoading, onViewDetails, recipeWarnings = [] } = props;
+  const {
+    bars,
+    isLoading,
+    onViewDetails,
+    recipeWarnings = [],
+    canViewDetails = true,
+  } = props;
 
   if (isLoading) {
     return (
@@ -75,8 +82,10 @@ export function BarsTable(props: BarsTableProps) {
         return (
           <Card
             key={bar.id}
-            className={`rounded-xl cursor-pointer hover:bg-muted/30 transition-colors border ${barWarnings.length > 0 ? 'border-amber-300' : ''}`}
-            onClick={() => onViewDetails(bar)}
+            className={`rounded-xl transition-colors border ${barWarnings.length > 0 ? 'border-amber-300' : ''} ${canViewDetails ? 'cursor-pointer hover:bg-muted/30' : ''}`}
+            onClick={() => {
+              if (canViewDetails) onViewDetails(bar);
+            }}
           >
             <CardContent className="px-4 py-3">
               <div className="flex items-center gap-4">
@@ -127,7 +136,9 @@ export function BarsTable(props: BarsTableProps) {
                 </div>
 
                 {/* Arrow */}
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                {canViewDetails && (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                )}
               </div>
             </CardContent>
           </Card>

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,7 @@ import { useEvents, useUnarchiveEvent } from '@/hooks/useEvents';
 import { EventFormDialog } from '@/components/events/EventFormDialog';
 import { useDemoSetup } from '@/hooks/useDemo';
 import type { Event, EventStatus } from '@/lib/api/types';
-import { Plus, Sparkles } from 'lucide-react';
+import { Plus, Sparkles, Calendar, Archive } from 'lucide-react';
 // Use persisted status from backend (source of truth)
 function getEventStatus(event: Event): EventStatus {
   return event.status || 'upcoming'; // Fallback to upcoming if status is missing
@@ -71,9 +71,35 @@ export function EventsListPage() {
 
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [demoProgress, setDemoProgress] = useState(0);
+  const [demoStepLabel, setDemoStepLabel] = useState('Preparando datos demo...');
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  useEffect(() => {
+    if (!isSettingUpDemo) {
+      setDemoProgress(0);
+      setDemoStepLabel('Preparando datos demo...');
+      return;
+    }
+
+    const tick = setInterval(() => {
+      setDemoProgress((prev) => {
+        const next = Math.min(prev + Math.max(2, Math.round((100 - prev) * 0.08)), 92);
+        if (next < 30) {
+          setDemoStepLabel('Creando evento y estructura base...');
+        } else if (next < 60) {
+          setDemoStepLabel('Cargando barras, productos y stock inicial...');
+        } else {
+          setDemoStepLabel('Finalizando datos demo...');
+        }
+        return next;
+      });
+    }, 450);
+
+    return () => clearInterval(tick);
+  }, [isSettingUpDemo]);
 
   const { sortKey, sortDir, handleSort } = useTableSort();
   const sortGetters: Record<string, (item: Event) => string | number | null | undefined> = {
@@ -123,6 +149,26 @@ export function EventsListPage() {
 
   const handleRowClick = (event: Event) => {
     navigate(`/events/${event.id}`);
+  };
+
+  const handleSetupDemo = () => {
+    setDemoProgress(5);
+    setDemoStepLabel('Preparando datos demo...');
+    setupDemo(undefined, {
+      onSuccess: (data) => {
+        setDemoProgress(100);
+        setDemoStepLabel('Evento demo listo');
+        if (data.event) {
+          setTimeout(() => {
+            navigate(`/events/${data.event.id}`);
+          }, 250);
+        }
+      },
+      onError: () => {
+        setDemoProgress(0);
+        setDemoStepLabel('Preparando datos demo...');
+      },
+    });
   };
 
   if (isLoading) {
@@ -198,15 +244,7 @@ export function EventsListPage() {
           )}
           <Button
             variant="outline"
-            onClick={() =>
-              setupDemo(undefined, {
-                onSuccess: (data) => {
-                  if (data.event) {
-                    navigate(`/events/${data.event.id}`);
-                  }
-                },
-              })
-            }
+            onClick={handleSetupDemo}
             disabled={isSettingUpDemo}
           >
             <Sparkles className="mr-2 h-4 w-4" />
@@ -214,6 +252,23 @@ export function EventsListPage() {
           </Button>
         </div>
       </div>
+
+      {isSettingUpDemo && (
+        <Card className="mb-4 rounded-2xl border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
+          <CardContent className="py-3">
+            <div className="mb-2 flex items-center justify-between text-xs text-blue-700 dark:text-blue-300">
+              <span className="font-medium">{demoStepLabel}</span>
+              <span>{demoProgress}%</span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/40">
+              <div
+                className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                style={{ width: `${demoProgress}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {events.length === 0 && !isLoading ? (
         <Card className="rounded-2xl">
@@ -260,40 +315,43 @@ export function EventsListPage() {
               </Select>
             </div>
 
-            <Card className="rounded-2xl border shadow-sm">
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <SortableTableHead sortKey="name" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
-                        Nombre
-                      </SortableTableHead>
-                      <SortableTableHead sortKey="venue" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
-                        Sede
-                      </SortableTableHead>
-                      <SortableTableHead sortKey="status" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
-                        Estado
-                      </SortableTableHead>
-                      <SortableTableHead sortKey="startedAt" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
-                        Inicio
-                      </SortableTableHead>
-                      <SortableTableHead sortKey="finishedAt" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
-                        Fin
-                      </SortableTableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedActiveEvents.length === 0 ? (
+            {sortedActiveEvents.length === 0 ? (
+              <Card className="rounded-2xl border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <Calendar className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    No hay eventos para mostrar
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Ajustá los filtros o creá un nuevo evento.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="rounded-2xl border shadow-sm">
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell
-                          colSpan={5}
-                          className="h-24 text-center text-muted-foreground"
-                        >
-                          No se encontraron eventos
-                        </TableCell>
+                        <SortableTableHead sortKey="name" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                          Nombre
+                        </SortableTableHead>
+                        <SortableTableHead sortKey="venue" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                          Sede
+                        </SortableTableHead>
+                        <SortableTableHead sortKey="status" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                          Estado
+                        </SortableTableHead>
+                        <SortableTableHead sortKey="startedAt" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                          Inicio
+                        </SortableTableHead>
+                        <SortableTableHead sortKey="finishedAt" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                          Fin
+                        </SortableTableHead>
                       </TableRow>
-                    ) : (
-                      sortedActiveEvents.map((event) => {
+                    </TableHeader>
+                    <TableBody>
+                      {sortedActiveEvents.map((event) => {
                         const status = getEventStatus(event);
                         return (
                           <TableRow
@@ -321,12 +379,12 @@ export function EventsListPage() {
                             <TableCell>{formatDate(event.finishedAt)}</TableCell>
                           </TableRow>
                         );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="archived" className="space-y-4">
@@ -339,41 +397,41 @@ export function EventsListPage() {
               />
             </div>
 
-            <Card className="rounded-2xl border shadow-sm">
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <SortableTableHead sortKey="name" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
-                        Nombre
-                      </SortableTableHead>
-                      <SortableTableHead sortKey="venue" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
-                        Sede
-                      </SortableTableHead>
-                      <SortableTableHead sortKey="status" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
-                        Estado
-                      </SortableTableHead>
-                      <SortableTableHead sortKey="startedAt" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
-                        Inicio
-                      </SortableTableHead>
-                      <SortableTableHead sortKey="finishedAt" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
-                        Fin
-                      </SortableTableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedArchivedEvents.length === 0 ? (
+            {sortedArchivedEvents.length === 0 ? (
+              <Card className="rounded-2xl border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <Archive className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    No hay eventos archivados
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="rounded-2xl border shadow-sm">
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell
-                          colSpan={6}
-                          className="h-24 text-center text-muted-foreground"
-                        >
-                          No hay eventos archivados
-                        </TableCell>
+                        <SortableTableHead sortKey="name" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                          Nombre
+                        </SortableTableHead>
+                        <SortableTableHead sortKey="venue" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                          Sede
+                        </SortableTableHead>
+                        <SortableTableHead sortKey="status" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                          Estado
+                        </SortableTableHead>
+                        <SortableTableHead sortKey="startedAt" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                          Inicio
+                        </SortableTableHead>
+                        <SortableTableHead sortKey="finishedAt" currentSort={sortKey} currentDirection={sortDir} onSort={handleSort}>
+                          Fin
+                        </SortableTableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
-                    ) : (
-                      sortedArchivedEvents.map((event) => {
+                    </TableHeader>
+                    <TableBody>
+                      {sortedArchivedEvents.map((event) => {
                         const status = getEventStatus(event);
                         return (
                           <TableRow
@@ -403,12 +461,12 @@ export function EventsListPage() {
                             </TableCell>
                           </TableRow>
                         );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       )}

@@ -23,7 +23,8 @@ export function useThresholds(eventId: number) {
     queryKey: alarmsKeys.thresholds(eventId),
     queryFn: () => alarmsApi.getThresholds(eventId),
     enabled: !!eventId,
-    refetchInterval: 5_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -91,7 +92,8 @@ export function useAlerts(eventId: number, status?: AlertStatus) {
     queryKey: alarmsKeys.alerts(eventId, status),
     queryFn: () => alarmsApi.getAlerts(eventId, status),
     enabled: !!eventId,
-    refetchInterval: 5_000,
+    staleTime: 15_000,
+    refetchOnWindowFocus: false,
   });
 }
 

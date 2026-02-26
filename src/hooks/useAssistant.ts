@@ -154,12 +154,15 @@ export function useAssistant() {
         const controller = new AbortController();
         abortRef.current = controller;
 
+        const headers = new Headers({ 'Content-Type': 'application/json' });
+        const authHeaders = getAuthHeaders();
+        if (authHeaders.Authorization) {
+          headers.set('Authorization', authHeaders.Authorization);
+        }
+
         const response = await fetch(`${API_BASE_URL}/assistant/chat`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeaders(),
-          },
+          headers,
           body: JSON.stringify({
             message: content.trim(),
             conversationId: conversationId || undefined,
@@ -240,6 +243,20 @@ export function useAssistant() {
             }
           }
         }
+
+        // Defensive close: if the stream finishes without explicit "done",
+        // ensure the assistant bubble is no longer marked as streaming.
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.role === 'assistant' && last.isStreaming) {
+            updated[updated.length - 1] = {
+              ...last,
+              isStreaming: false,
+            };
+          }
+          return updated;
+        });
 
         // Refresh conversations list
         queryClient.invalidateQueries({ queryKey: ['assistant-conversations'] });

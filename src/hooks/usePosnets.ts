@@ -15,7 +15,8 @@ export function useEventPosnets(eventId: number) {
     queryKey: posnetsKeys.list(eventId),
     queryFn: () => posnetsApi.getPosnets(eventId),
     enabled: !!eventId,
-    refetchInterval: 5_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -24,6 +25,8 @@ export function usePosnet(id: number) {
     queryKey: posnetsKeys.detail(id),
     queryFn: () => posnetsApi.getPosnet(id),
     enabled: !!id,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 }
 

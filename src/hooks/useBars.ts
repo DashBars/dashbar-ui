@@ -18,7 +18,8 @@ export function useBars(eventId: number) {
   return useQuery({
     queryKey: barsKeys.list(eventId),
     queryFn: () => barsApi.getBars(eventId),
-    refetchInterval: 5_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     retry: (failureCount, error: any) => {
       // Don't retry on 401 (unauthorized)
       if (error?.response?.status === 401) {
@@ -34,6 +35,8 @@ export function useBar(eventId: number, barId: number) {
     queryKey: barsKeys.detail(eventId, barId),
     queryFn: () => barsApi.getBar(eventId, barId),
     enabled: !!eventId && !!barId,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 }
 

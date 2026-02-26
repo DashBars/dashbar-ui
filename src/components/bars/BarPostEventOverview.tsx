@@ -448,27 +448,18 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<BulkReturnMode | null>(null);
   const [result, setResult] = useState<BulkReturnResult | null>(null);
-
-  const bulkReturnMutation = useMutation({
-    mutationFn: (dto: BulkReturnStockDto) => stockMovementsApi.bulkReturn(dto),
-    onSuccess: (data) => {
-      setResult(data);
-      queryClient.invalidateQueries({ queryKey: ['stock'] });
-      queryClient.invalidateQueries({ queryKey: ['global-inventory'] });
-      setSelected(new Set());
-      if (data.errors.length === 0) {
-        toast.success(`${data.processed} items procesados correctamente`);
-      } else {
-        toast.warning(`${data.processed} procesados, ${data.errors.length} errores`);
-      }
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Error al procesar devoluciones');
-    },
+  const [tableConsumptionExpanded, setTableConsumptionExpanded] = useState(true);
+  const [isBulkReturning, setIsBulkReturning] = useState(false);
+  const [bulkReturnProgress, setBulkReturnProgress] = useState({
+    processed: 0,
+    total: 0,
+    chunk: 0,
+    totalChunks: 0,
   });
 
   const [discardResult, setDiscardResult] = useState<BulkDiscardResult | null>(null);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+  const [consumptionExpanded, setConsumptionExpanded] = useState(true);
 
   const bulkDiscardMutation = useMutation({
     mutationFn: (dto: BulkDiscardStockDto) => stockMovementsApi.bulkDiscard(dto),
@@ -537,7 +528,7 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
     setConfirmOpen(true);
   };
 
-  const executeAction = () => {
+  const executeAction = async () => {
     if (!pendingAction) return;
 
     // Always filter to only items with stock remaining
@@ -549,30 +540,95 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
       return;
     }
 
-    const dto: BulkReturnStockDto = {
-      mode: pendingAction,
-      items: itemsToProcess.map((s) => {
-        // Convert ml -> units (bottles) since backend expects units
-        // Partial remainders are now handled separately, so unitQuantity is always >= 1
-        const drinkVolume = s.drink?.volume || 0;
-        const unitQuantity = drinkVolume > 0
-          ? Math.floor(s.quantity / drinkVolume)
-          : s.quantity;
-        return {
-          eventId,
-          barId: s.barId,
-          drinkId: s.drinkId,
-          supplierId: s.supplierId,
-          sellAsWholeUnit: s.sellAsWholeUnit,
-          quantity: unitQuantity,
-        };
-      }),
-      notes: pendingAction === 'auto'
-        ? 'Procesamiento automático post-evento'
-        : undefined,
+    const items = itemsToProcess.map((s) => {
+      // Convert ml -> units (bottles) since backend expects units.
+      const drinkVolume = s.drink?.volume || 0;
+      const unitQuantity = drinkVolume > 0 ? Math.floor(s.quantity / drinkVolume) : s.quantity;
+      return {
+        eventId,
+        barId: s.barId,
+        drinkId: s.drinkId,
+        supplierId: s.supplierId,
+        sellAsWholeUnit: s.sellAsWholeUnit,
+        quantity: unitQuantity,
+      };
+    });
+
+    const CHUNK_SIZE = 3;
+    const totalChunks = Math.ceil(items.length / CHUNK_SIZE);
+    const aggregate: BulkReturnResult = {
+      processed: 0,
+      toGlobal: 0,
+      toSupplier: 0,
+      errors: [],
     };
 
-    bulkReturnMutation.mutate(dto);
+    setIsBulkReturning(true);
+    setBulkReturnProgress({
+      processed: 0,
+      total: items.length,
+      chunk: 0,
+      totalChunks,
+    });
+
+    try {
+      for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+        const chunkItems = items.slice(i, i + CHUNK_SIZE);
+        const currentChunk = Math.floor(i / CHUNK_SIZE) + 1;
+
+        setBulkReturnProgress((prev) => ({
+          ...prev,
+          chunk: currentChunk,
+          totalChunks,
+        }));
+
+        const dto: BulkReturnStockDto = {
+          mode: pendingAction,
+          items: chunkItems,
+          notes:
+            pendingAction === 'auto'
+              ? 'Procesamiento automático post-evento'
+              : undefined,
+        };
+
+        const data = await stockMovementsApi.bulkReturn(dto);
+        aggregate.processed += data.processed;
+        aggregate.toGlobal += data.toGlobal;
+        aggregate.toSupplier += data.toSupplier;
+        aggregate.errors.push(...data.errors);
+
+        setBulkReturnProgress({
+          processed: Math.min(i + chunkItems.length, items.length),
+          total: items.length,
+          chunk: currentChunk,
+          totalChunks,
+        });
+      }
+
+      setBulkReturnProgress((prev) => ({
+        ...prev,
+        processed: prev.total,
+      }));
+
+      setResult(aggregate);
+      queryClient.invalidateQueries({ queryKey: ['stock'] });
+      queryClient.invalidateQueries({ queryKey: ['global-inventory'] });
+      setSelected(new Set());
+
+      if (aggregate.errors.length === 0) {
+        toast.success(`${aggregate.processed} items procesados correctamente`);
+      } else {
+        toast.warning(
+          `${aggregate.processed} procesados, ${aggregate.errors.length} errores`,
+        );
+      }
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message || 'Error al procesar devoluciones',
+      );
+    } finally {
+      setIsBulkReturning(false);
+    }
   };
 
   const actionLabels: Record<BulkReturnMode, string> = {
@@ -642,44 +698,58 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
         {consumptionData.length > 0 && (
           <Card className="rounded-2xl">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="rounded-lg bg-purple-500/10 p-1.5">
-                  <Zap className="h-3.5 w-3.5 text-purple-600" />
+              <button
+                type="button"
+                className="flex w-full items-center justify-between text-left"
+                onClick={() => setConsumptionExpanded((v) => !v)}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-purple-500/10 p-1.5">
+                    <Zap className="h-3.5 w-3.5 text-purple-600" />
+                  </div>
+                  <p className="text-sm font-medium">
+                    {consumptionData.length} {consumptionData.length === 1 ? 'insumo consumido' : 'insumos consumidos'} durante el evento
+                  </p>
                 </div>
-                <p className="text-sm font-medium">
-                  {consumptionData.length} {consumptionData.length === 1 ? 'insumo consumido' : 'insumos consumidos'} durante el evento
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                {consumptionData.map((item) => {
-                  const units = item.drinkVolume > 0 ? (item.totalConsumedMl / item.drinkVolume) : 0;
-                  const displayUnits = units % 1 === 0 ? units.toString() : units.toFixed(1);
-                  return (
-                    <div
-                      key={`${item.drinkId}-${item.supplierId}-${item.sellAsWholeUnit}`}
-                      className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-muted/40"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{item.drinkName}</span>
-                        {item.drinkBrand && (
-                          <span className="text-xs text-muted-foreground">({item.drinkBrand})</span>
-                        )}
-                        <span className="text-xs text-muted-foreground">- {item.supplierName}</span>
+                {consumptionExpanded ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+
+              {consumptionExpanded && (
+                <div className="space-y-1.5 mt-3">
+                  {consumptionData.map((item) => {
+                    const units = item.drinkVolume > 0 ? (item.totalConsumedMl / item.drinkVolume) : 0;
+                    const displayUnits = units % 1 === 0 ? units.toString() : units.toFixed(1);
+                    return (
+                      <div
+                        key={`${item.drinkId}-${item.supplierId}-${item.sellAsWholeUnit}`}
+                        className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-muted/40"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{item.drinkName}</span>
+                          {item.drinkBrand && (
+                            <span className="text-xs text-muted-foreground">({item.drinkBrand})</span>
+                          )}
+                          <span className="text-xs text-muted-foreground">- {item.supplierName}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            {item.drinkVolume > 0
+                              ? `${displayUnits} ${units === 1 ? 'unidad' : 'unidades'} (${item.totalConsumedMl.toLocaleString('es-AR')} ml)`
+                              : `${item.totalConsumedMl.toLocaleString('es-AR')} ml`}
+                          </span>
+                          <Badge variant="outline" className={`text-[10px] ${item.sellAsWholeUnit ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800' : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800'}`}>
+                            {item.sellAsWholeUnit ? 'Venta directa' : 'Recetas'}
+                          </Badge>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          {item.drinkVolume > 0
-                            ? `${displayUnits} ${units === 1 ? 'unidad' : 'unidades'} (${item.totalConsumedMl.toLocaleString('es-AR')} ml)`
-                            : `${item.totalConsumedMl.toLocaleString('es-AR')} ml`}
-                        </span>
-                        <Badge variant="outline" className={`text-[10px] ${item.sellAsWholeUnit ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800' : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800'}`}>
-                          {item.sellAsWholeUnit ? 'Venta directa' : 'Recetas'}
-                        </Badge>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -771,7 +841,7 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
           size="sm"
           className="gap-1.5"
           onClick={() => openConfirm('auto')}
-          disabled={returnableStock.length === 0 || bulkReturnMutation.isPending}
+          disabled={returnableStock.length === 0 || isBulkReturning}
         >
           <Zap className="h-4 w-4" />
           Procesar todo automáticamente
@@ -790,7 +860,7 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
           size="sm"
           className="gap-1.5"
           onClick={() => openConfirm('to_global')}
-          disabled={selected.size === 0 || selectedPurchased.length === 0 || bulkReturnMutation.isPending}
+          disabled={selected.size === 0 || selectedPurchased.length === 0 || isBulkReturning}
         >
           <Warehouse className="h-3.5 w-3.5" />
           Devolver al almacén
@@ -804,7 +874,7 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
           size="sm"
           className="gap-1.5"
           onClick={() => openConfirm('to_supplier')}
-          disabled={selected.size === 0 || selectedConsignment.length === 0 || bulkReturnMutation.isPending}
+          disabled={selected.size === 0 || selectedConsignment.length === 0 || isBulkReturning}
         >
           <Undo2 className="h-3.5 w-3.5" />
           Devolver al proveedor
@@ -914,20 +984,31 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
                       colSpan={showBarColumn ? 8 : 7}
                       className="py-2 px-4"
                     >
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 text-xs text-muted-foreground"
+                        onClick={() =>
+                          setTableConsumptionExpanded((v) => !v)
+                        }
+                      >
                         <div className="h-px flex-1 bg-border" />
                         <span className="flex items-center gap-1">
                           <Zap className="h-3 w-3 text-purple-500" />
                           Consumidos durante el evento ({consumptionData.length})
+                          {tableConsumptionExpanded ? (
+                            <ChevronUp className="h-3.5 w-3.5 ml-1" />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                          )}
                         </span>
                         <div className="h-px flex-1 bg-border" />
-                      </div>
+                      </button>
                     </TableCell>
                   </TableRow>
                 )}
 
                 {/* Consumed items from inventory movements */}
-                {consumptionData.map((item) => {
+                {tableConsumptionExpanded && consumptionData.map((item) => {
                   const key = `consumed-${item.drinkId}-${item.supplierId}-${item.sellAsWholeUnit}`;
                   const units = item.drinkVolume > 0 ? (item.totalConsumedMl / item.drinkVolume) : 0;
                   const displayUnits = units % 1 === 0 ? units.toString() : units.toFixed(1);
@@ -1005,7 +1086,7 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
 
       {/* Confirmation dialog */}
       <Dialog open={confirmOpen} onOpenChange={(open) => {
-        if (!bulkReturnMutation.isPending) {
+        if (!isBulkReturning) {
           setConfirmOpen(open);
           if (!open) {
             setResult(null);
@@ -1024,6 +1105,36 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
                 : 'Revisá el detalle antes de confirmar.'}
             </DialogDescription>
           </DialogHeader>
+
+          {bulkReturnProgress.total > 0 && (isBulkReturning || !!result) && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-800 dark:bg-blue-950/30">
+              <div className="mb-2 flex items-center justify-between text-xs text-blue-700 dark:text-blue-300">
+                <span className="font-medium">
+                  {isBulkReturning ? 'Procesando devoluciones...' : 'Procesamiento completado'}
+                </span>
+                <span>
+                  {bulkReturnProgress.processed}/{bulkReturnProgress.total} items
+                  {' · '}
+                  Lote {Math.max(1, bulkReturnProgress.chunk)}/{Math.max(1, bulkReturnProgress.totalChunks)}
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/40">
+                <div
+                  className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                  style={{
+                    width: `${Math.round(
+                      isBulkReturning
+                        ? Math.max(
+                            (bulkReturnProgress.processed / bulkReturnProgress.total) * 100,
+                            8,
+                          )
+                        : (bulkReturnProgress.processed / bulkReturnProgress.total) * 100,
+                    )}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           {result ? (
             <div className="space-y-3 py-2">
@@ -1128,24 +1239,25 @@ export function BarPostEventOverview({ eventId, barId }: BarPostEventOverviewPro
                     )}
                   </div>
                 )}
+
               </div>
 
               <DialogFooter>
                 <Button
                   variant="outline"
                   onClick={() => setConfirmOpen(false)}
-                  disabled={bulkReturnMutation.isPending}
+                  disabled={isBulkReturning}
                 >
                   Cancelar
                 </Button>
                 <Button
                   onClick={executeAction}
-                  disabled={bulkReturnMutation.isPending}
+                  disabled={isBulkReturning}
                 >
-                  {bulkReturnMutation.isPending ? (
+                  {isBulkReturning ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Procesando...
+                      Procesando {bulkReturnProgress.processed}/{bulkReturnProgress.total}...
                     </>
                   ) : (
                     'Confirmar'

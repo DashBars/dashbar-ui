@@ -14,7 +14,8 @@ export function useEventRecipes(eventId: number) {
     queryKey: recipesKeys.list(eventId),
     queryFn: () => recipesApi.getRecipes(eventId),
     enabled: !!eventId,
-    refetchInterval: 5_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 }
 

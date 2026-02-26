@@ -639,17 +639,19 @@ export function EventAlarmsTab({ eventId, isActive }: EventAlarmsTabProps) {
                 </SelectContent>
               </Select>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => forceCheckMutation.mutate()}
-                disabled={forceCheckMutation.isPending}
-              >
-                <RefreshCw
-                  className={`h-3.5 w-3.5 mr-1 ${forceCheckMutation.isPending ? 'animate-spin' : ''}`}
-                />
-                Verificar ahora
-              </Button>
+              {isActive && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => forceCheckMutation.mutate()}
+                  disabled={forceCheckMutation.isPending}
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 mr-1 ${forceCheckMutation.isPending ? 'animate-spin' : ''}`}
+                  />
+                  Verificar ahora
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>

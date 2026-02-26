@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,7 @@ import { BarPostEventOverview } from '@/components/bars/BarPostEventOverview';
 import { AssignStockWizard } from '@/components/bars/AssignStockWizard';
 import { EventAlarmsTab } from '@/components/events/EventAlarmsTab';
 import { useAlerts } from '@/hooks/useAlarms';
+import { EventFormDialog } from '@/components/events/EventFormDialog';
 import {
   useDemoSimulationStatus,
   useStartSimulation,
@@ -96,13 +97,13 @@ export function EventDetailsPage() {
   // Support deep-linking to a specific tab via location.state.tab
   const stateTab = (location.state as { tab?: string } | null)?.tab;
   const isActive = status === 'active';
-  // Default tab: "monitoring" for active events, "overview" for finished, "bars" for upcoming
-  const defaultTab = stateTab || (isActive ? 'monitoring' : isFinished ? 'overview' : 'bars');
-  const [activeTab, setActiveTab] = useState(defaultTab);
+  const [activeTab, setActiveTab] = useState('bars');
+  const [hasUserSelectedTab, setHasUserSelectedTab] = useState(false);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activateDialogOpen, setActivateDialogOpen] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [editEventDialogOpen, setEditEventDialogOpen] = useState(false);
   
   // Bars state
   const { data: bars, isLoading: isLoadingBars } = useBars(eventIdNum);
@@ -124,6 +125,37 @@ export function EventDetailsPage() {
   const { mutate: startSim, isPending: isStartingSim } = useStartSimulation(eventIdNum);
   const { mutate: stopSim, isPending: isStoppingSim } = useStopSimulation(eventIdNum);
   const isSimulating = simStatus?.running ?? false;
+
+  useEffect(() => {
+    const allowedTabs = new Set<string>(['bars', 'recipes', 'pos']);
+    if (isActive) allowedTabs.add('monitoring');
+    if (showAlarmsTab) allowedTabs.add('alarms');
+    if (isFinished) {
+      allowedTabs.add('overview');
+      allowedTabs.add('reports');
+    }
+
+    if (stateTab && allowedTabs.has(stateTab)) {
+      setActiveTab(stateTab);
+      return;
+    }
+
+    // Auto-select a sensible tab on initial load/status change
+    if (!hasUserSelectedTab) {
+      const preferredTab = isActive
+        ? 'monitoring'
+        : isFinished
+          ? 'overview'
+          : 'bars';
+      setActiveTab(preferredTab);
+      return;
+    }
+
+    // If current tab becomes invalid after a status change, fallback to best tab
+    if (!allowedTabs.has(activeTab)) {
+      setActiveTab(isActive ? 'monitoring' : isFinished ? 'overview' : 'bars');
+    }
+  }, [stateTab, isActive, isFinished, showAlarmsTab, hasUserSelectedTab, activeTab]);
 
   // Compute recipe ingredient warnings PER BAR at the event level
   // Each bar of a given type is checked individually
@@ -292,7 +324,7 @@ export function EventDetailsPage() {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => {
-                    // TODO: open edit dialog when implemented
+                    setEditEventDialogOpen(true);
                   }}
                 >
                   <Pencil className="mr-2 h-4 w-4 text-blue-600" />
@@ -371,7 +403,14 @@ export function EventDetailsPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          setHasUserSelectedTab(true);
+          setActiveTab(value);
+        }}
+        className="space-y-4"
+      >
         <TabsList>
           {/* Monitoring tab only for active events */}
           {isActive && (
@@ -414,6 +453,13 @@ export function EventDetailsPage() {
         )}
 
         <TabsContent value="bars" className="space-y-4">
+          {isFinished && (
+            <Card className="rounded-xl border-dashed">
+              <CardContent className="py-3 text-sm text-muted-foreground">
+                Vista simplificada: para eventos finalizados la gestión detallada está en el resumen del evento.
+              </CardContent>
+            </Card>
+          )}
           <BarsPageHeader
             eventId={eventIdNum}
             eventName={event.name}
@@ -436,6 +482,7 @@ export function EventDetailsPage() {
             bars={filteredBars}
             isLoading={isLoadingBars}
             onViewDetails={handleBarClick}
+            canViewDetails={!isFinished}
             recipeWarnings={(status === 'upcoming' || status === 'active') ? eventRecipeWarnings : []}
           />
         </TabsContent>
@@ -487,6 +534,14 @@ export function EventDetailsPage() {
           open={activateDialogOpen}
           onOpenChange={setActivateDialogOpen}
           recipeWarnings={eventRecipeWarnings}
+        />
+      )}
+
+      {event && (
+        <EventFormDialog
+          event={event}
+          open={editEventDialogOpen}
+          onOpenChange={setEditEventDialogOpen}
         />
       )}
 

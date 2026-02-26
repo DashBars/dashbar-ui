@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBar } from '@/hooks/useBars';
 import { useEvent } from '@/hooks/useEvents';
 import { StockTab } from '@/components/bars/StockTab';
-import { RecipeOverridesTab } from '@/components/bars/RecipeOverridesTab';
+import { EventRecipesTab } from '@/components/events/EventRecipesTab';
 import { PosnetsTab } from '@/components/bars/PosnetsTab';
 import type { BarStatus, BarType } from '@/lib/api/types';
 import { Button } from '@/components/ui/button';
@@ -569,7 +569,12 @@ export function BarManagementPage() {
           </TabsContent>
 
           <TabsContent value="recipes" className="space-y-4">
-            <RecipeOverridesTab eventId={eventIdNum} barId={barIdNum} barType={bar?.type as BarType | undefined} />
+            <EventRecipesTab
+              eventId={eventIdNum}
+              isEditable={event?.status === 'upcoming'}
+              showWarnings={false}
+              onNavigateToBarras={() => setActiveTab('stock')}
+            />
           </TabsContent>
 
           <TabsContent value="pos" className="space-y-4">

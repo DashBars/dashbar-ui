@@ -63,7 +63,7 @@ export function AssistantPanel({
       {/* Backdrop */}
       {open && (
         <div
-          className="fixed inset-0 bg-black/20 z-40 md:hidden"
+          className="fixed inset-0 bg-black/20 z-40"
           onClick={onClose}
         />
       )}
@@ -127,7 +127,7 @@ export function AssistantPanel({
                 <span className="text-2xl">💬</span>
               </div>
               <h4 className="font-semibold text-sm mb-1">
-                ¡Hola! Soy tu asistente Dashbar
+                ¡Hola! Soy tu asistente Dash
               </h4>
               <p className="text-xs text-muted-foreground mb-4">
                 Preguntame sobre tus eventos, stock, ventas, recetas y más.

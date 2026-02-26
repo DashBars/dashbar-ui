@@ -60,13 +60,13 @@ export function AssignBarStockDialog({
     }
   }, [open]);
 
-  // Find existing direct-sale recipe price for a drink name
+  // Find existing direct-sale recipe price for a specific drink
   const getExistingDirectSalePrice = useCallback(
-    (drinkName: string): number | null => {
+    (drinkId: number): number | null => {
       const match = eventRecipes.find(
         (r) =>
-          r.cocktailName.toLowerCase() === drinkName.toLowerCase() &&
           r.components.length === 1 &&
+          r.components[0].drinkId === drinkId &&
           r.components[0].percentage === 100 &&
           r.salePrice > 0,
       );
@@ -92,9 +92,9 @@ export function AssignBarStockDialog({
 
   // Detect existing price for the selected drink (direct-sale recipe)
   const existingPriceCents = useMemo(() => {
-    if (!selectedItem?.drink?.name || !sellAsWholeUnit) return null;
-    return getExistingDirectSalePrice(selectedItem.drink.name);
-  }, [selectedItem?.drink?.name, sellAsWholeUnit, getExistingDirectSalePrice]);
+    if (!selectedItem?.drink?.id || !sellAsWholeUnit) return null;
+    return getExistingDirectSalePrice(selectedItem.drink.id);
+  }, [selectedItem?.drink?.id, sellAsWholeUnit, getExistingDirectSalePrice]);
 
   const hasExistingPrice = existingPriceCents !== null;
   const isPriceLocked = hasExistingPrice;

@@ -50,7 +50,7 @@ interface AssignStockWizardProps {
 
 interface ItemConfig {
   globalInventoryId: number;
-  drink: { name: string; brand: string; volume: number };
+  drink: { id: number; name: string; brand: string; volume: number };
   supplier: string;
   availableQuantity: number;
   unitCost: number;
@@ -94,6 +94,12 @@ export function AssignStockWizard({
   const [itemConfigs, setItemConfigs] = useState<Map<number, ItemConfig>>(new Map());
   const [searchFilter, setSearchFilter] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
+  const [assignProgress, setAssignProgress] = useState({
+    completed: 0,
+    total: 0,
+    success: 0,
+    errors: 0,
+  });
 
   // Reset when dialog closes
   useEffect(() => {
@@ -104,6 +110,7 @@ export function AssignStockWizard({
       setItemConfigs(new Map());
       setSearchFilter('');
       setIsAssigning(false);
+      setAssignProgress({ completed: 0, total: 0, success: 0, errors: 0 });
     }
   }, [open]);
 
@@ -185,6 +192,7 @@ export function AssignStockWizard({
         configs.set(id, {
           globalInventoryId: id,
           drink: {
+            id: inv.drink?.id || 0,
             name: inv.drink?.name || '',
             brand: inv.drink?.brand || '',
             volume: inv.drink?.volume || 0,
@@ -217,7 +225,7 @@ export function AssignStockWizard({
     const groupMap = new Map<string, ConfigGroup>();
 
     for (const [id, config] of itemConfigs) {
-      const key = `${config.drink.name.toLowerCase()}|${config.drink.brand.toLowerCase()}|${config.drink.volume}`;
+      const key = `${config.drink.id}|${config.drink.name.toLowerCase()}|${config.drink.brand.toLowerCase()}|${config.drink.volume}`;
 
       if (!groupMap.has(key)) {
         groupMap.set(key, {
@@ -306,13 +314,13 @@ export function AssignStockWizard({
     [barCount],
   );
 
-  // Find existing direct-sale recipe price for a drink name
+  // Find existing direct-sale recipe price for a specific drink
   const getExistingDirectSalePrice = useCallback(
-    (drinkName: string): number | null => {
+    (drinkId: number): number | null => {
       const match = eventRecipes.find(
         (r) =>
-          r.cocktailName.toLowerCase() === drinkName.toLowerCase() &&
           r.components.length === 1 &&
+          r.components[0].drinkId === drinkId &&
           r.components[0].percentage === 100 &&
           r.salePrice > 0,
       );
@@ -329,8 +337,11 @@ export function AssignStockWizard({
 
         // Determine auto-fill price when switching to direct sale
         let autoPrice = '';
+        const groupDrinkId = itemConfigs.get(group.suppliers[0].configId)?.drink.id;
         if (sellAsWholeUnit) {
-          const existingPrice = getExistingDirectSalePrice(group.drinkName);
+          const existingPrice = groupDrinkId
+            ? getExistingDirectSalePrice(groupDrinkId)
+            : null;
           if (existingPrice) {
             autoPrice = (existingPrice / 100).toString();
           } else {
@@ -363,7 +374,7 @@ export function AssignStockWizard({
         return next;
       });
     },
-    [getExistingDirectSalePrice],
+    [getExistingDirectSalePrice, itemConfigs],
   );
 
   // Update price for all items in a group + sync to other groups with same drink name
@@ -428,37 +439,72 @@ export function AssignStockWizard({
   const handleAssignAll = async () => {
     if (selectedBarIds.size === 0 || !validateConfigs()) return;
 
-    setIsAssigning(true);
-    let successCount = 0;
-    let errorCount = 0;
-
+    const tasks: Array<{ dto: AssignStockDto; barId: number; drinkName: string }> = [];
     for (const barId of selectedBarIds) {
       for (const [, config] of itemConfigs) {
         const qty = parseInt(config.quantity, 10);
-        if (!qty || qty <= 0) continue; // skip configs with no quantity (grouped distribution)
+        if (!qty || qty <= 0) continue;
 
-        const dto: AssignStockDto = {
-          globalInventoryId: config.globalInventoryId,
-          eventId,
+        tasks.push({
           barId,
-          quantity: qty,
-          sellAsWholeUnit: config.sellAsWholeUnit,
-          salePrice: config.sellAsWholeUnit
-            ? Math.round(parseFloat(config.salePrice) * 100)
-            : undefined,
-        };
-
-        try {
-          await stockMovementsApi.assign(dto);
-          successCount++;
-        } catch (error: any) {
-          errorCount++;
-          const barName = bars.find((b) => b.id === barId)?.name || `Barra #${barId}`;
-          toast.error(
-            `Error al asignar ${config.drink.name} a ${barName}: ${error?.response?.data?.message || error.message}`,
-          );
-        }
+          drinkName: config.drink.name,
+          dto: {
+            globalInventoryId: config.globalInventoryId,
+            eventId,
+            barId,
+            quantity: qty,
+            sellAsWholeUnit: config.sellAsWholeUnit,
+            salePrice: config.sellAsWholeUnit
+              ? Math.round(parseFloat(config.salePrice) * 100)
+              : undefined,
+          },
+        });
       }
+    }
+
+    if (tasks.length === 0) {
+      toast.error('No hay asignaciones para procesar');
+      return;
+    }
+
+    setIsAssigning(true);
+    setAssignProgress({ completed: 0, total: tasks.length, success: 0, errors: 0 });
+
+    let successCount = 0;
+    let errorCount = 0;
+    const CHUNK_SIZE = 10;
+    const sampleErrors: string[] = [];
+
+    for (let i = 0; i < tasks.length; i += CHUNK_SIZE) {
+      const chunk = tasks.slice(i, i + CHUNK_SIZE);
+      const results = await Promise.allSettled(
+        chunk.map((task) => stockMovementsApi.assign(task.dto)),
+      );
+
+      results.forEach((res, idx) => {
+        if (res.status === 'fulfilled') {
+          successCount++;
+          return;
+        }
+        errorCount++;
+        if (sampleErrors.length < 3) {
+          const task = chunk[idx];
+          const barName =
+            bars.find((b) => b.id === task.barId)?.name || `Barra #${task.barId}`;
+          const reason =
+            (res.reason as any)?.response?.data?.message ||
+            (res.reason as any)?.message ||
+            'Error desconocido';
+          sampleErrors.push(`${task.drinkName} -> ${barName}: ${reason}`);
+        }
+      });
+
+      setAssignProgress({
+        completed: Math.min(i + chunk.length, tasks.length),
+        total: tasks.length,
+        success: successCount,
+        errors: errorCount,
+      });
     }
 
     setIsAssigning(false);
@@ -474,6 +520,12 @@ export function AssignStockWizard({
         numBars === 1
           ? `${groupCount} producto${groupCount > 1 ? 's' : ''} asignado${groupCount > 1 ? 's' : ''} a ${selectedBars[0]?.name}`
           : `${groupCount} producto${groupCount > 1 ? 's' : ''} asignado${groupCount > 1 ? 's' : ''} a ${numBars} barras`,
+      );
+    }
+
+    if (errorCount > 0) {
+      toast.warning(
+        `${errorCount} asignaciones con error.${sampleErrors.length ? ` Ejemplos: ${sampleErrors.join(' | ')}` : ''}`,
       );
     }
 
@@ -742,9 +794,10 @@ export function AssignStockWizard({
                 const sellAsWholeUnit = firstConfig.sellAsWholeUnit;
                 const salePrice = firstConfig.salePrice;
                 const salePriceNum = parseFloat(salePrice);
-                const existingPriceCents = sellAsWholeUnit
-                  ? getExistingDirectSalePrice(group.drinkName)
-                  : null;
+                const existingPriceCents =
+                  sellAsWholeUnit && firstConfig?.drink.id
+                    ? getExistingDirectSalePrice(firstConfig.drink.id)
+                    : null;
                 const hasExistingPrice = existingPriceCents !== null;
                 const isPriceLocked = hasExistingPrice;
 
@@ -944,6 +997,23 @@ export function AssignStockWizard({
                   ? `Distribuyendo ${configGroups.length} producto${configGroups.length !== 1 ? 's' : ''} a ${barCount} barras. Esto puede tomar unos segundos.`
                   : `Asignando ${configGroups.length} producto${configGroups.length !== 1 ? 's' : ''}...`}
               </p>
+              {assignProgress.total > 0 && (
+                <p className="text-xs mt-1">
+                  {assignProgress.completed}/{assignProgress.total} procesadas · ok {assignProgress.success} · errores {assignProgress.errors}
+                </p>
+              )}
+              {assignProgress.total > 0 && (
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/40">
+                  <div
+                    className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                    style={{
+                      width: `${Math.round(
+                        (assignProgress.completed / assignProgress.total) * 100,
+                      )}%`,
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -992,7 +1062,7 @@ export function AssignStockWizard({
                 {isAssigning ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Asignando...
+                    Asignando {assignProgress.completed}/{assignProgress.total}...
                   </>
                 ) : (
                   <>

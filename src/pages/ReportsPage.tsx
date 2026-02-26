@@ -333,32 +333,121 @@ function ComparisonResults({
   showDetails: boolean;
   onToggleDetails: () => void;
 }) {
+  const sortedRows = [...data.eventComparison].sort(
+    (a, b) => b.totalRevenue - a.totalRevenue,
+  );
+  const totals = sortedRows.reduce(
+    (acc, row) => ({
+      revenue: acc.revenue + row.totalRevenue,
+      cogs: acc.cogs + row.totalCOGS,
+      profit: acc.profit + row.grossProfit,
+      orders: acc.orders + row.totalOrderCount,
+      units: acc.units + row.totalUnitsSold,
+    }),
+    { revenue: 0, cogs: 0, profit: 0, orders: 0, units: 0 },
+  );
+  const avgMargin =
+    sortedRows.length > 0
+      ? Math.round(
+          (sortedRows.reduce((sum, row) => sum + row.marginPercent, 0) /
+            sortedRows.length) *
+            100,
+        ) / 100
+      : 0;
+  const bestRevenueRow = sortedRows[0];
+  const bestMarginRow =
+    sortedRows.length > 0
+      ? sortedRows.reduce((best, row) =>
+          row.marginPercent > best.marginPercent ? row : best,
+        )
+      : null;
+
+  const readableInsights = data.insights
+    .map((insight) => {
+      if (insight.type === 'consistent_top_product') {
+        return `Producto consistente: ${insight.data.name} aparece en top 5 en ${insight.data.eventsInTop5}/${insight.data.totalEvents} eventos (share promedio ${insight.data.avgSharePercent}%).`;
+      }
+      if (insight.type === 'peak_time_pattern') {
+        const hour = String(insight.data.hourOfDay).padStart(2, '0');
+        return `Patron horario: el pico se concentra cerca de las ${hour}:00 en ${insight.data.eventsWithPeak}/${insight.data.totalEvents} eventos.`;
+      }
+      if (insight.type === 'margin_outlier') {
+        return `Margen atipico: ${insight.data.eventName} (${insight.data.marginPercent}%) vs promedio ${Math.round(insight.data.avgMargin)}%.`;
+      }
+      if (insight.type === 'volume_outlier') {
+        return `Volumen atipico: ${insight.data.eventName} con ${insight.data.unitsPerHour} uds/h vs promedio ${Math.round(insight.data.avgUnitsPerHour)} uds/h.`;
+      }
+      return insight.message;
+    })
+    .slice(0, 6);
+
   return (
     <div className="space-y-6">
+      {/* Executive summary */}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-xs text-muted-foreground">Eventos comparados</div>
+            <div className="mt-1 text-2xl font-semibold">{sortedRows.length}</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Base de comparacion actual
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-xs text-muted-foreground">Ingresos totales</div>
+            <div className="mt-1 text-2xl font-semibold text-green-600 dark:text-green-400">
+              {formatCurrency(totals.revenue)}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Ganancia total: {formatCurrency(totals.profit)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-xs text-muted-foreground">Mejor evento (ingresos)</div>
+            <div className="mt-1 text-base font-semibold truncate">
+              {bestRevenueRow?.eventName ?? '-'}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {bestRevenueRow ? formatCurrency(bestRevenueRow.totalRevenue) : '-'}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-xs text-muted-foreground">Mejor margen</div>
+            <div className="mt-1 text-base font-semibold truncate">
+              {bestMarginRow?.eventName ?? '-'}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Promedio: {avgMargin}% · Top: {bestMarginRow?.marginPercent ?? 0}%
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Insights */}
-      {data.insights.length > 0 && (
+      {readableInsights.length > 0 && (
         <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2 text-amber-800 dark:text-amber-300">
               <Lightbulb className="h-5 w-5" />
-              Insights Automaticos
+              Insights clave
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {data.insights.map((insight, i) => (
+              {readableInsights.map((insight, i) => (
                 <div
                   key={i}
                   className="flex items-start gap-3 p-3 bg-white dark:bg-slate-900 rounded-lg border"
                 >
-                  <InsightIcon type={insight.type} />
+                  <Lightbulb className="h-5 w-5 text-amber-500 shrink-0" />
                   <div>
-                    <div className="text-sm font-medium">{insight.message}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {insight.type === 'consistent_top_product' && `Share promedio: ${insight.data.avgSharePercent}%`}
-                      {insight.type === 'margin_outlier' && `Diferencia: ${insight.data.difference}pp`}
-                      {insight.type === 'volume_outlier' && `Ratio vs promedio: ${insight.data.ratio}x`}
-                    </div>
+                    <div className="text-sm font-medium">{insight}</div>
                   </div>
                 </div>
               ))}
@@ -385,10 +474,14 @@ function ComparisonResults({
           </div>
         </CardHeader>
         <CardContent>
+          <div className="mb-3 text-xs text-muted-foreground">
+            Ordenado por <span className="font-medium">ingresos</span> de mayor a menor.
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
+                  <th className="text-left py-2 pr-3 font-medium text-muted-foreground">#</th>
                   <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Evento</th>
                   <th className="text-right py-2 px-3 font-medium text-muted-foreground">Ingresos</th>
                   <th className="text-right py-2 px-3 font-medium text-muted-foreground">COGS</th>
@@ -407,8 +500,13 @@ function ComparisonResults({
                 </tr>
               </thead>
               <tbody>
-                {data.eventComparison.map((row, idx) => (
+                {sortedRows.map((row, idx) => (
                   <tr key={row.eventId} className="border-b last:border-0 hover:bg-muted/50">
+                    <td className="py-3 pr-3">
+                      <Badge variant={idx === 0 ? 'default' : 'outline'}>
+                        {idx + 1}
+                      </Badge>
+                    </td>
                     <td className="py-3 pr-4">
                       <div className="flex items-center gap-2">
                         <div

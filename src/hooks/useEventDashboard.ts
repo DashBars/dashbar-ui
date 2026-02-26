@@ -60,10 +60,12 @@ export interface EventDashboardState {
 
 const MAX_RECENT_SALES = 25;
 const MAX_ALERTS = 15;
-const REFETCH_INTERVAL = 5_000; // 5s fallback re-fetch
+const REFETCH_INTERVAL = 10_000; // 10s fallback re-fetch
+const WS_INVALIDATION_THROTTLE_MS = 10_000;
 
 export function useEventDashboard(eventId: number) {
   const queryClient = useQueryClient();
+  const lastWsInvalidationRef = useRef(0);
 
   // ── REST initial data ──
   const {
@@ -186,9 +188,13 @@ export function useEventDashboard(eventId: number) {
 
       setRecentSales((prev) => [sale, ...prev].slice(0, MAX_RECENT_SALES));
 
-      // Also invalidate queries so REST data updates
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'totals', eventId] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'top-products', eventId] });
+      // Throttle REST invalidations to avoid one network roundtrip per sale.
+      const now = Date.now();
+      if (now - lastWsInvalidationRef.current >= WS_INVALIDATION_THROTTLE_MS) {
+        lastWsInvalidationRef.current = now;
+        queryClient.invalidateQueries({ queryKey: ['dashboard', 'totals', eventId] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard', 'top-products', eventId] });
+      }
     };
 
     // ── pos:state_update ──

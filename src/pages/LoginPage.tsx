@@ -105,12 +105,6 @@ export function LoginPage() {
               )}
             </Button>
           </form>
-          <div className="mt-6 text-xs text-muted-foreground text-center space-y-1">
-            <p>Credenciales de prueba:</p>
-            <p>Gerente: owner@dashbar.com / password123</p>
-            <p>Cajero: cashier@dashbar.com / password123</p>
-            <p>Administrador: admin@dashbar.com / password123</p>
-          </div>
         </CardContent>
       </Card>
     </div>

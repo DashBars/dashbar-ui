@@ -19,7 +19,8 @@ export function useEventProducts(eventId: number, barId?: number) {
     queryKey: productsKeys.list(eventId, barId),
     queryFn: () => productsApi.getProducts(eventId, barId),
     enabled: !!eventId,
-    refetchInterval: 5_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -28,6 +29,8 @@ export function useProduct(eventId: number, productId: number) {
     queryKey: productsKeys.detail(eventId, productId),
     queryFn: () => productsApi.getProduct(eventId, productId),
     enabled: !!eventId && !!productId,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 }
 

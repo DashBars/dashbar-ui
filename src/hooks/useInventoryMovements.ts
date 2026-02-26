@@ -15,7 +15,8 @@ export function useInventoryMovements(eventId: number, barId: number) {
     queryKey: inventoryMovementsKeys.list(eventId, barId),
     queryFn: () => inventoryMovementsApi.findAll(eventId, barId),
     enabled: !!eventId && !!barId,
-    refetchInterval: 5_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -24,5 +25,7 @@ export function useGlobalInventoryMovements(globalInventoryId: number) {
     queryKey: inventoryMovementsKeys.byGlobal(globalInventoryId),
     queryFn: () => inventoryMovementsApi.findByGlobalInventory(globalInventoryId),
     enabled: !!globalInventoryId,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 }
