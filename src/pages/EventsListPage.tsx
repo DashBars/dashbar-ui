@@ -55,10 +55,16 @@ function StatusBadge({ status }: { status: EventStatus }) {
     finished: 'bg-gray-100 text-gray-800 border-gray-200',
     archived: 'bg-purple-100 text-purple-800 border-purple-200',
   };
+  const labels: Record<EventStatus, string> = {
+    upcoming: 'Próximo',
+    active: 'Activo',
+    finished: 'Finalizado',
+    archived: 'Archivado',
+  };
 
   return (
     <Badge variant="outline" className={variants[status] || variants.upcoming}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+      {labels[status] || labels.upcoming}
     </Badge>
   );
 }
